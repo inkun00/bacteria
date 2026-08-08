@@ -186,6 +186,16 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .cell.will-infect .germ-sprite { filter: saturate(.7) brightness(1.35) drop-shadow(0 0 10px currentColor); transform: scale(.86); }
 .preview-ring { position: absolute; inset: 5px; border: 1px dashed var(--coral-soft); border-radius: 50%; animation: spin 2s linear infinite; pointer-events: none; }
 .cell.arrived .germ-sprite { animation: land .48s cubic-bezier(.2,.9,.25,1.25), spriteIdle 1.35s steps(6) .48s infinite; }
+.cell.hit { z-index: 7; animation: cellImpact .72s ease-out; }
+.cell.hit::after { content: ""; position: absolute; inset: 7%; z-index: 3; pointer-events: none; border: 2px solid rgba(255,255,255,.9); border-radius: 50%; box-shadow: 0 0 18px currentColor, inset 0 0 14px currentColor; animation: impactRing .68s ease-out forwards; }
+
+.infection-projectile-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+.infection-projectile { position: absolute; left: var(--sx); top: var(--sy); width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0; animation: infectionShot 560ms cubic-bezier(.22,.68,.24,1) var(--delay) both; }
+.infection-projectile.p1 { color: var(--cyan); background: #d7fff8; box-shadow: 0 0 6px #fff, 0 0 13px var(--cyan), 0 0 24px var(--cyan); }
+.infection-projectile.p2 { color: var(--coral); background: #fff0e8; box-shadow: 0 0 6px #fff, 0 0 13px var(--coral), 0 0 24px var(--coral); }
+.infection-projectile::before, .infection-projectile::after { content: ""; position: absolute; inset: -6px; border: 1px solid currentColor; border-radius: 50%; animation: projectilePulse .28s ease-in-out infinite alternate; }
+.infection-projectile::after { inset: -12px; opacity: .28; animation-delay: .12s; }
+.infection-projectile i { position: absolute; right: 6px; top: 50%; width: 25px; height: 3px; border-radius: 99px; transform: translateY(-50%); background: linear-gradient(90deg, transparent, currentColor); filter: blur(1px); opacity: .75; }
 
 .germ-sprite { display: block; width: 93%; aspect-ratio: 1; background-repeat: no-repeat; pointer-events: none; will-change: background-position, transform; }
 .germ-sprite.idle { background-image: url("/assets/bacteria-idle.png"); background-size: 700% 200%; animation: spriteIdle 1.35s steps(6) infinite; }
@@ -293,6 +303,15 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes land { 0% { transform: translateY(-18px) scale(.4); opacity: 0; } 65% { transform: translateY(2px) scale(1.18); } 100% { transform: none; opacity: 1; } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes infectionShot {
+  0% { left: var(--sx); top: var(--sy); opacity: 0; transform: translate(-50%, -50%) scale(.25); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.25); }
+  82% { opacity: 1; }
+  100% { left: var(--ex); top: var(--ey); opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
+}
+@keyframes projectilePulse { to { transform: scale(1.25); opacity: .18; } }
+@keyframes cellImpact { 0% { transform: none; } 20% { transform: scale(.86) rotate(-3deg); } 44% { transform: scale(1.08) rotate(2deg); } 100% { transform: none; } }
+@keyframes impactRing { 0% { transform: scale(.2); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
 
 @media (max-width: 960px) {
   .game-layout { grid-template-columns: 1fr 1fr; align-items: stretch; }

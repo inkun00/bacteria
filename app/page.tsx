@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   BOARD_SIZE,
   applyMove,
@@ -22,6 +22,13 @@ type Snapshot = {
   player: Player;
   move: number;
   captures: [number, number];
+};
+
+type InfectionProjectile = {
+  id: number;
+  from: number;
+  to: number;
+  player: Player;
 };
 
 const DIFFICULTY = {
@@ -64,6 +71,7 @@ export default function Home() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
   const [thinking, setThinking] = useState(false);
+  const [animating, setAnimating] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<0 | Player>(0);
   const [moveNumber, setMoveNumber] = useState(1);
@@ -71,9 +79,22 @@ export default function Home() {
   const [captures, setCaptures] = useState<[number, number]>([0, 0]);
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [infection, setInfection] = useState<{ cells: number[]; player: Player } | null>(null);
+  const [projectiles, setProjectiles] = useState<InfectionProjectile[]>([]);
   const [arrived, setArrived] = useState<number | null>(null);
   const [notice, setNotice] = useState("청록 균주가 먼저 증식합니다");
   const audioRef = useRef<AudioContext | null>(null);
+  const sequenceTimers = useRef<number[]>([]);
+
+  const clearSequenceTimers = useCallback(() => {
+    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    sequenceTimers.current = [];
+  }, []);
+
+  const schedule = useCallback((callback: () => void, delay: number) => {
+    const timer = window.setTimeout(callback, delay);
+    sequenceTimers.current.push(timer);
+    return timer;
+  }, []);
 
   const scores = useMemo(() => score(board), [board]);
   const emptyCount = board.filter((cell) => cell === 0).length;
@@ -141,45 +162,83 @@ export default function Home() {
   }, [playTone, settings.mode]);
 
   const executeMove = useCallback((move: Move, player: Player) => {
-    if (gameOver) return;
+    if (gameOver || animating) return;
+    clearSequenceTimers();
+    setAnimating(true);
     setHistory((previous) => [...previous, { board: [...board], player: currentPlayer, move: moveNumber, captures: [...captures] as [number, number] }]);
     const result = applyMove(board, player, move);
-    setBoard(result.board);
+    const opponent: Player = player === 1 ? 2 : 1;
+    const movedBoard = [...result.board];
+    result.infected.forEach((index) => { movedBoard[index] = opponent; });
+    setBoard(movedBoard);
     setSelected(null);
     setHovered(null);
     setMoveNumber((value) => value + 1);
     setArrived(move.to);
-    window.setTimeout(() => setArrived(null), 520);
+    playTone("move");
+    schedule(() => setArrived(null), 500);
     if (result.infected.length) {
-      setCaptures((value) => {
-        const next: [number, number] = [...value] as [number, number];
-        next[player - 1] += result.infected.length;
-        return next;
-      });
-      setInfection({ cells: result.infected, player });
-      window.setTimeout(() => setInfection(null), 760);
-      playTone("infect");
+      setNotice(`${player === 1 ? "청록" : "코랄"} 균주가 ${result.infected.length}개 표본을 조준합니다`);
+      schedule(() => {
+        setProjectiles(result.infected.map((to, id) => ({ id, from: move.to, to, player })));
+        setNotice("감염 발사체 전개 — 충돌에 대비하세요");
+      }, 260);
+      schedule(() => {
+        setBoard(result.board);
+        setInfection({ cells: result.infected, player });
+        setCaptures((value) => {
+          const next: [number, number] = [...value] as [number, number];
+          next[player - 1] += result.infected.length;
+          return next;
+        });
+        setNotice(`${result.infected.length}개 상대 균주가 감염되었습니다`);
+        playTone("infect");
+      }, 820);
+      schedule(() => {
+        setInfection(null);
+        setProjectiles([]);
+        setAnimating(false);
+        resolveEnd(result.board, player, opponent);
+      }, 1580);
     } else {
-      playTone("move");
+      schedule(() => {
+        setAnimating(false);
+        resolveEnd(result.board, player, opponent);
+      }, 560);
     }
-    const nextPlayer = player === 1 ? 2 : 1;
-    resolveEnd(result.board, player, nextPlayer);
-  }, [board, captures, currentPlayer, gameOver, moveNumber, playTone, resolveEnd]);
+  }, [animating, board, captures, clearSequenceTimers, currentPlayer, gameOver, moveNumber, playTone, resolveEnd, schedule]);
 
   useEffect(() => {
-    if (setupOpen || gameOver || settings.mode !== "ai" || currentPlayer !== 2) {
+    if (setupOpen || gameOver || animating || settings.mode !== "ai" || currentPlayer !== 2) {
       setThinking(false);
       return;
     }
     setThinking(true);
-    const delay = settings.difficulty === "hard" ? 760 : 540;
-    const timer = window.setTimeout(() => {
-      const move = chooseAiMove(board, settings.difficulty, 2);
+    setNotice("CORTEX가 배양판을 분석하고 있습니다");
+    const move = chooseAiMove(board, settings.difficulty, 2);
+    if (!move) return;
+    const pacing = settings.difficulty === "hard" ? 160 : 0;
+    const selectTimer = window.setTimeout(() => {
+      setSelected(move.from);
+      playTone("select");
+      setNotice("CORTEX가 증식할 코랄 세균을 선택했습니다");
+    }, 420 + pacing);
+    const targetTimer = window.setTimeout(() => {
+      setHovered(move.to);
+      setNotice("CORTEX가 이동 지점과 감염 범위를 조준합니다");
+    }, 900 + pacing);
+    const moveTimer = window.setTimeout(() => {
       setThinking(false);
-      if (move) executeMove(move, 2);
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [board, currentPlayer, executeMove, gameOver, settings, setupOpen]);
+      executeMove(move, 2);
+    }, 1360 + pacing);
+    return () => {
+      window.clearTimeout(selectTimer);
+      window.clearTimeout(targetTimer);
+      window.clearTimeout(moveTimer);
+    };
+  }, [animating, board, currentPlayer, executeMove, gameOver, playTone, settings, setupOpen]);
+
+  useEffect(() => () => clearSequenceTimers(), [clearSequenceTimers]);
 
   useEffect(() => {
     if (setupOpen || gameOver) return;
@@ -188,6 +247,7 @@ export default function Home() {
   }, [gameOver, setupOpen]);
 
   const startGame = useCallback((nextSettings = draftSettings) => {
+    clearSequenceTimers();
     setSettings(nextSettings);
     setDraftSettings(nextSettings);
     setBoard(createBoard());
@@ -195,6 +255,7 @@ export default function Home() {
     setSelected(null);
     setHovered(null);
     setThinking(false);
+    setAnimating(false);
     setGameOver(false);
     setWinner(0);
     setMoveNumber(1);
@@ -202,12 +263,13 @@ export default function Home() {
     setCaptures([0, 0]);
     setHistory([]);
     setInfection(null);
+    setProjectiles([]);
     setNotice("청록 균주가 먼저 증식합니다");
     setSetupOpen(false);
-  }, [draftSettings]);
+  }, [clearSequenceTimers, draftSettings]);
 
   const handleCell = (index: number) => {
-    if (gameOver || thinking || (settings.mode === "ai" && currentPlayer === 2)) return;
+    if (gameOver || thinking || animating || (settings.mode === "ai" && currentPlayer === 2)) return;
     const move = targetMap.get(index);
     if (move) {
       executeMove(move, currentPlayer);
@@ -215,6 +277,7 @@ export default function Home() {
     }
     if (board[index] === currentPlayer) {
       setSelected(selected === index ? null : index);
+      setNotice(selected === index ? "세균 선택을 취소했습니다" : "빛나는 칸을 선택해 증식하세요");
       playTone("select");
     } else {
       setSelected(null);
@@ -222,7 +285,7 @@ export default function Home() {
   };
 
   const undo = () => {
-    if (!history.length || thinking) return;
+    if (!history.length || thinking || animating) return;
     const steps = settings.mode === "ai" ? Math.min(2, history.length) : 1;
     const snapshot = history[history.length - steps];
     setBoard(snapshot.board);
@@ -234,6 +297,7 @@ export default function Home() {
     setWinner(0);
     setSelected(null);
     setInfection(null);
+    setProjectiles([]);
     setNotice("이전 배양 상태로 복원했습니다");
   };
 
@@ -308,6 +372,7 @@ export default function Home() {
                         move ? `legal ${move.distance === 1 ? "clone" : "jump"}` : "",
                         previewInfections.has(index) ? "will-infect" : "",
                         arrived === index ? "arrived" : "",
+                        isInfected ? "hit" : "",
                       ].filter(Boolean).join(" ")}
                       onClick={() => handleCell(index)}
                       onMouseEnter={() => move && setHovered(index)}
@@ -322,13 +387,36 @@ export default function Home() {
                     </button>
                   );
                 })}
+                {projectiles.length > 0 && (
+                  <div className="infection-projectile-layer" aria-hidden="true">
+                    {projectiles.map((projectile) => {
+                      const fromRow = Math.floor(projectile.from / BOARD_SIZE);
+                      const fromCol = projectile.from % BOARD_SIZE;
+                      const toRow = Math.floor(projectile.to / BOARD_SIZE);
+                      const toCol = projectile.to % BOARD_SIZE;
+                      return (
+                        <span
+                          key={`${projectile.from}-${projectile.to}-${projectile.id}`}
+                          className={`infection-projectile p${projectile.player}`}
+                          style={{
+                            "--sx": `${((fromCol + .5) / BOARD_SIZE) * 100}%`,
+                            "--sy": `${((fromRow + .5) / BOARD_SIZE) * 100}%`,
+                            "--ex": `${((toCol + .5) / BOARD_SIZE) * 100}%`,
+                            "--ey": `${((toRow + .5) / BOARD_SIZE) * 100}%`,
+                            "--delay": `${projectile.id * 45}ms`,
+                          } as CSSProperties}
+                        ><i /></span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
             <div className="frame-label bottom"><span>BIO-CONTAINMENT: STABLE</span><b>◈ SECURE</b></div>
           </div>
 
           <div className="board-controls">
-            <button onClick={undo} disabled={!history.length || thinking}><span>↶</span> 되돌리기</button>
+            <button onClick={undo} disabled={!history.length || thinking || animating}><span>↶</span> 되돌리기</button>
             <div className="legend"><span><i className="clone-dot" />1칸 복제</span><span><i className="jump-dot" />2칸 이동</span></div>
             <button onClick={() => startGame(settings)}><span>↻</span> 재배양</button>
           </div>
