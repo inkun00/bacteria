@@ -1,40 +1,33 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "페트리 수학 연구소 — 약수와 배수 세균전",
-  description: "약수와 배수를 찾으며 즐기는 수학 세균전. 컴퓨터 또는 친구와 함께할 수 있습니다.",
+  title: "Factor Force | 약수와 배수 지구 방어대",
+  description: "치료 세균을 지휘해 세계의 숫자 질병 세균을 제거하는 약수와 배수 수학 전략 게임",
   icons: {
     icon: `${basePath}/favicon.png`,
     shortcut: `${basePath}/favicon.png`,
   },
+  openGraph: {
+    title: "Factor Force | 약수와 배수 지구 방어대",
+    description: "11개 세계 작전에서 약수와 배수를 배우고 지구를 해방하세요.",
+    images: [`${basePath}/og.png`],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Factor Force | 약수와 배수 지구 방어대",
+    description: "약수와 배수로 지구를 구하는 수학 전략 게임",
+    images: [`${basePath}/og.png`],
+  },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ko">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

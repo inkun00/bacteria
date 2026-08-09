@@ -2,896 +2,544 @@
 
 export const dynamic = "force-static";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
 import {
-  applyMove,
-  chooseAiAction,
-  compositeNumberAt,
-  createBoard,
-  createNumbers,
-  factorPairs,
-  getBoardSize,
-  isRelation,
-  legalMoves,
-  score,
-  type Cell,
-  type BoardSize,
-  type Difficulty,
-  type Move,
-  type NumberCell,
-  type Player,
-  type RelationMode,
-} from "./game";
+  MODE_COPY,
+  STORY_STAGES,
+  applyBossPulse,
+  applyStoryMove,
+  chooseStoryAiMove,
+  createStoryBattle,
+  type StoryBattle,
+  type StoryStage,
+} from "./story";
 
-type Mode = "ai" | "local";
-type Settings = { mode: Mode; difficulty: Difficulty; boardSize: BoardSize };
-type Snapshot = {
-  board: Cell[];
-  numbers: NumberCell[];
-  player: Player;
-  move: number;
-  captures: [number, number];
-  bombs: [number, number];
-  bombCharge: [number, number];
-  relationMode: RelationMode;
-};
+const STORY_SAVE_KEY = "factor-force-story-progress-v1";
 
-type SavedGame = {
-  version: 1;
-  board: Cell[];
-  numbers: NumberCell[];
-  currentPlayer: Player;
-  selected: number | null;
-  relationMode: RelationMode;
-  settings: Settings;
-  setupOpen: boolean;
-  gameOver: boolean;
-  winner: 0 | Player;
-  moveNumber: number;
-  elapsed: number;
-  captures: [number, number];
-  bombs: [number, number];
-  bombCharge: [number, number];
-  bombArmed: boolean;
-  history: Snapshot[];
-};
+const OPENING_CAPTIONS = [
+  "서기 2042년, 숫자를 바꾸며 증식하는 질병 세균이 지구 전역에 나타났다.",
+  "약수와 배수의 감염망이 완성되면 지구의 모든 생명은 멈추고 만다.",
+  "수학 연구소는 질병 세균을 역감염시키는 ‘치료 세균’을 개발했다.",
+  "세계의 감염 지역을 해방하고, 태평양의 원천균을 제거하라!",
+];
 
-type InfectionProjectile = {
-  id: number;
-  from: number;
-  to: number;
-  player: Player;
-  bomb: boolean;
-};
+const ENDING_CAPTIONS = [
+  "마지막 치료 파장이 원천균의 숫자 방어막을 무너뜨렸다.",
+  "남아 있던 질병 세균은 모두 치료 세균으로 바뀌었다.",
+  "해방된 대륙에 생명이 돌아오고, 지구는 다시 푸르게 빛났다.",
+  "임무 완료. 약수와 배수로 지켜 낸 우리의 행성에 평화가 찾아왔다.",
+];
 
-const DIFFICULTY = {
-  easy: { label: "쉬움", detail: "천천히 생각해요", bars: 1 },
-  medium: { label: "보통", detail: "알맞게 생각해요", bars: 2 },
-  hard: { label: "어려움", detail: "여러 수를 미리 봐요", bars: 3 },
-} as const;
-const BOARD_SIZES: BoardSize[] = [7, 9, 11];
+type View = "map" | "battle";
+type BattleResult = "clear" | "failed" | null;
+type CinematicKind = "opening" | "ending";
 
-const SAVED_GAME_KEY = "petri-math-lab-game-v1";
-
-function formatTime(seconds: number) {
-  const min = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const sec = (seconds % 60).toString().padStart(2, "0");
-  return `${min}:${sec}`;
+function loadProgress() {
+  if (typeof window === "undefined") return [] as number[];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(STORY_SAVE_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= 11) : [];
+  } catch {
+    return [];
+  }
 }
 
-function modeLabel(mode: RelationMode) {
-  if (mode === "divisor") return "약수";
-  if (mode === "multiple") return "배수";
-  return "분열";
-}
-
-function nextMode(mode: RelationMode): RelationMode {
-  if (mode === "divisor") return "multiple";
-  if (mode === "multiple") return "split";
-  return "divisor";
-}
-
-function normalizeSettings(value: Partial<Settings> | undefined, fallbackSize: BoardSize = 7): Settings {
-  const mode: Mode = value?.mode === "local" ? "local" : "ai";
-  const difficulty: Difficulty = value?.difficulty === "easy" || value?.difficulty === "hard" ? value.difficulty : "medium";
-  const boardSize = BOARD_SIZES.includes(value?.boardSize as BoardSize) ? value?.boardSize as BoardSize : fallbackSize;
-  return { mode, difficulty, boardSize };
+function stageModeLabel(modes: RelationMode[]) {
+  return modes.map((mode) => MODE_COPY[mode].label.replace(" 모드", "")).join(" · ");
 }
 
 function Germ({
-  player,
-  infection = false,
+  kind,
   number,
-  mode,
+  boss = false,
+  active = false,
 }: {
-  player: Player;
-  infection?: boolean;
-  number?: number;
-  mode?: RelationMode;
+  kind: "therapy" | "disease";
+  number: number;
+  boss?: boolean;
+  active?: boolean;
 }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const sprite = infection ? "bacteria-infection.png" : "bacteria-idle.png";
-
   return (
-    <span
-      className={`germ-sprite p${player} ${infection ? "infection" : "idle"}`}
-      aria-hidden="true"
-      style={{ backgroundImage: `url("${basePath}/assets/${sprite}")` }}
-    >
-      {number !== undefined && <b className="germ-number">{number}</b>}
-      {mode && <em className={`germ-mode ${mode}`}>{mode === "divisor" ? "약" : mode === "multiple" ? "배" : "분"}</em>}
+    <span className={`story-germ ${kind} ${boss ? "boss" : ""} ${active ? "active" : ""}`} aria-hidden="true">
+      <i className="germ-eye left" />
+      <i className="germ-eye right" />
+      <b>{number}</b>
     </span>
   );
 }
 
-function DifficultyBars({ count }: { count: number }) {
+function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => void }) {
+  const [captionIndex, setCaptionIndex] = useState(0);
+  const captions = kind === "opening" ? OPENING_CAPTIONS : ENDING_CAPTIONS;
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (captionIndex < captions.length - 1) setCaptionIndex((value) => value + 1);
+      else onFinish();
+    }, captionIndex === 0 ? 3200 : 2800);
+    return () => window.clearTimeout(timer);
+  }, [captionIndex, captions.length, onFinish]);
+
   return (
-    <span className="difficulty-bars" aria-hidden="true">
-      {[1, 2, 3].map((bar) => <i key={bar} className={bar <= count ? "on" : ""} />)}
-    </span>
+    <div className="cinematic" role="dialog" aria-modal="true" aria-label={kind === "opening" ? "오프닝" : "엔딩"}>
+      <img src={`${basePath}/assets/story/${kind}.png`} alt="" />
+      <div className="cinematic-vignette" />
+      <div className="cinematic-topline">
+        <span>{kind === "opening" ? "FACTOR FORCE · PROLOGUE" : "FACTOR FORCE · EPILOGUE"}</span>
+        <button onClick={onFinish}>건너뛰기 <i>››</i></button>
+      </div>
+      <div className="cinematic-copy" key={captionIndex}>
+        <small>{kind === "opening" ? `긴급 기록 0${captionIndex + 1}` : `평화 기록 0${captionIndex + 1}`}</small>
+        <p>{captions[captionIndex]}</p>
+        <div className="caption-progress">
+          {captions.map((_, index) => <i key={index} className={index <= captionIndex ? "on" : ""} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorldMap({
+  selected,
+  completed,
+  onSelect,
+}: {
+  selected: number;
+  completed: number[];
+  onSelect: (id: number) => void;
+}) {
+  const unlocked = Math.min(11, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
+  return (
+    <section className="world-map" aria-label="세계 감염 지도">
+      <div className="map-grid" />
+      <div className="continent north-america"><span>북아메리카</span></div>
+      <div className="continent south-america"><span>남아메리카</span></div>
+      <div className="continent europe"><span>유럽</span></div>
+      <div className="continent africa"><span>아프리카</span></div>
+      <div className="continent asia"><span>아시아</span></div>
+      <div className="continent oceania"><span>오세아니아</span></div>
+      <div className="map-route" aria-hidden="true" />
+      {STORY_STAGES.map((stage) => {
+        const isComplete = completed.includes(stage.id);
+        const isUnlocked = stage.id <= unlocked || isComplete;
+        return (
+          <button
+            key={stage.id}
+            className={`stage-pin ${selected === stage.id ? "selected" : ""} ${isComplete ? "complete" : ""} ${!isUnlocked ? "locked" : ""} ${stage.boss ? "boss-pin" : ""}`}
+            style={{ left: `${stage.x}%`, top: `${stage.y}%` }}
+            onClick={() => isUnlocked && onSelect(stage.id)}
+            aria-label={`${stage.id} 스테이지 ${stage.title}${isUnlocked ? "" : " 잠김"}`}
+          >
+            <span>{isComplete ? "✓" : isUnlocked ? stage.id : "⌁"}</span>
+            <em>{stage.id === 11 ? "BOSS" : stage.place.split(" · ")[1]}</em>
+          </button>
+        );
+      })}
+      <div className="map-legend"><span><i className="complete" /> 해방 완료</span><span><i className="current" /> 작전 가능</span><span><i className="danger" /> 감염 지역</span></div>
+    </section>
+  );
+}
+
+function StagePanel({
+  stage,
+  complete,
+  locked,
+  onStart,
+}: {
+  stage: StoryStage;
+  complete: boolean;
+  locked: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <aside className="stage-panel">
+      <div className="stage-panel-head">
+        <span className="stage-number">{stage.id === 11 ? "BOSS" : `0${stage.id}`.slice(-2)}</span>
+        <div><small>{stage.lesson}</small><h2>{stage.title}</h2></div>
+      </div>
+      <div className="location-line"><i>⌖</i> {stage.place} <span>{stage.continent}</span></div>
+      <p className="stage-story">{stage.story}</p>
+      <div className="mission-box">
+        <small>MISSION OBJECTIVE</small>
+        <strong>{stage.mission}</strong>
+      </div>
+      <dl className="stage-facts">
+        <div><dt>학습 목표</dt><dd>{stage.learning}</dd></div>
+        <div><dt>사용 모드</dt><dd>{stageModeLabel(stage.modes)}</dd></div>
+        <div><dt>핵심 단서</dt><dd>{stage.example}</dd></div>
+      </dl>
+      <div className="difficulty-line"><span>위험도</span><div>{[1, 2, 3].map((level) => <i key={level} className={level <= stage.difficulty ? "on" : ""} />)}</div></div>
+      <button className="deploy-button" disabled={locked} onClick={onStart}>
+        {locked ? "이전 지역을 먼저 해방하세요" : complete ? "다시 작전하기" : stage.id === 1 ? "오프닝부터 시작" : "치료 세균 투입"}
+        {!locked && <span>→</span>}
+      </button>
+    </aside>
+  );
+}
+
+function BattleBoard({
+  battle,
+  stage,
+  selected,
+  hovered,
+  flash,
+  disabled,
+  onCell,
+  onHover,
+}: {
+  battle: StoryBattle;
+  stage: StoryStage;
+  selected: number | null;
+  hovered: number | null;
+  flash: { infected: number[]; resisted: number[] };
+  disabled: boolean;
+  onCell: (index: number) => void;
+  onHover: (index: number | null) => void;
+}) {
+  const targets = useMemo(() => new Set(
+    selected === null ? [] : legalMoves(battle.board, 1).filter((move) => move.from === selected).map((move) => move.to),
+  ), [battle.board, selected]);
+
+  return (
+    <div className="battle-board" role="grid" aria-label="감염 치료 전장">
+      {battle.board.map((cell, index) => {
+        const number = battle.numbers[index];
+        const isBoss = battle.bossIndex === index && battle.bossHp > 0;
+        return (
+          <button
+            key={index}
+            role="gridcell"
+            className={`battle-cell ${cell === 0 ? "empty" : cell === 1 ? "therapy-cell" : "disease-cell"} ${selected === index ? "selected" : ""} ${targets.has(index) ? "target" : ""} ${flash.infected.includes(index) ? "infected" : ""} ${flash.resisted.includes(index) ? "resisted" : ""} ${isBoss ? "boss-cell" : ""}`}
+            onClick={() => onCell(index)}
+            onMouseEnter={() => onHover(index)}
+            onMouseLeave={() => onHover(null)}
+            disabled={disabled}
+            aria-label={cell === 0 ? `빈 칸 ${index + 1}` : `${cell === 1 ? "치료" : "질병"} 세균 ${number}${isBoss ? `, 보스 내성 ${battle.bossHp}` : ""}`}
+          >
+            {cell !== 0 && number !== null && <Germ kind={cell === 1 ? "therapy" : "disease"} number={number} boss={isBoss} active={hovered === index || selected === index} />}
+            {targets.has(index) && <span className="target-mark">+</span>}
+            {isBoss && <span className="boss-hp-mini">{battle.bossHp}</span>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
 export default function Home() {
-  const [board, setBoard] = useState<Cell[]>(createBoard);
-  const [numbers, setNumbers] = useState<NumberCell[]>(() =>
-    createBoard().map((cell, index) => cell === 0 ? null : compositeNumberAt(index * 5)),
-  );
-  const [currentPlayer, setCurrentPlayer] = useState<Player>(1);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [relationMode, setRelationMode] = useState<RelationMode>("divisor");
-  const [settings, setSettings] = useState<Settings>({ mode: "ai", difficulty: "medium", boardSize: 7 });
-  const [draftSettings, setDraftSettings] = useState<Settings>({ mode: "ai", difficulty: "medium", boardSize: 7 });
-  const [setupOpen, setSetupOpen] = useState(true);
-  const [rulesOpen, setRulesOpen] = useState(false);
-  const [soundOn, setSoundOn] = useState(true);
-  const [thinking, setThinking] = useState(false);
-  const [animating, setAnimating] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
-  const [winner, setWinner] = useState<0 | Player>(0);
-  const [moveNumber, setMoveNumber] = useState(1);
-  const [elapsed, setElapsed] = useState(0);
-  const [captures, setCaptures] = useState<[number, number]>([0, 0]);
-  const [bombs, setBombs] = useState<[number, number]>([2, 2]);
-  const [bombCharge, setBombCharge] = useState<[number, number]>([0, 0]);
-  const [chargeBurst, setChargeBurst] = useState<Player | null>(null);
-  const [bombArmed, setBombArmed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const [restartPromptOpen, setRestartPromptOpen] = useState(false);
-  const [restartReason, setRestartReason] = useState<"refresh" | "escape" | "manual">("manual");
-  const [history, setHistory] = useState<Snapshot[]>([]);
-  const [infection, setInfection] = useState<{ cells: number[]; player: Player } | null>(null);
-  const [resisted, setResisted] = useState<number[]>([]);
-  const [projectiles, setProjectiles] = useState<InfectionProjectile[]>([]);
-  const [arrived, setArrived] = useState<number | null>(null);
-  const [notice, setNotice] = useState("내 세균을 고른 뒤 약수·배수·분열 중 하나를 선택하세요");
-  const audioRef = useRef<AudioContext | null>(null);
-  const sequenceTimers = useRef<number[]>([]);
+  const [completed, setCompleted] = useState<number[]>([]);
+  const [selectedStageId, setSelectedStageId] = useState(1);
+  const [view, setView] = useState<View>("map");
+  const [battleStageId, setBattleStageId] = useState(1);
+  const [battle, setBattle] = useState<StoryBattle>(() => createStoryBattle(STORY_STAGES[0]));
+  const [selectedCell, setSelectedCell] = useState<number | null>(null);
+  const [hoveredCell, setHoveredCell] = useState<number | null>(null);
+  const [relationMode, setRelationMode] = useState<RelationMode>("divisor");
+  const [turn, setTurn] = useState<1 | 2>(1);
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("치료 세균을 선택한 뒤 빛나는 칸으로 이동하세요.");
+  const [flash, setFlash] = useState<{ infected: number[]; resisted: number[] }>({ infected: [], resisted: [] });
+  const [moveCount, setMoveCount] = useState(0);
+  const [result, setResult] = useState<BattleResult>(null);
+  const [cinematic, setCinematic] = useState<CinematicKind | null>(null);
+  const [freeBattle, setFreeBattle] = useState(false);
+  const timers = useRef<number[]>([]);
+
+  const selectedStage = STORY_STAGES[selectedStageId - 1];
+  const battleStage = STORY_STAGES[battleStageId - 1];
+  const unlocked = Math.min(11, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
 
   useEffect(() => {
-    try {
-      const raw = window.sessionStorage.getItem(SAVED_GAME_KEY);
-      const saved = raw ? JSON.parse(raw) as Partial<SavedGame> : null;
-      const savedSize = Array.isArray(saved?.board) ? Math.sqrt(saved.board.length) : 0;
-      const valid = saved?.version === 1
-        && BOARD_SIZES.includes(savedSize as BoardSize)
-        && Array.isArray(saved.board)
-        && Array.isArray(saved.numbers) && saved.numbers.length === saved.board.length;
-      if (valid) {
-        setBoard(saved.board as Cell[]);
-        setNumbers(saved.numbers as NumberCell[]);
-        setCurrentPlayer(saved.currentPlayer === 2 ? 2 : 1);
-        setSelected(typeof saved.selected === "number" ? saved.selected : null);
-        setRelationMode(saved.relationMode === "multiple" || saved.relationMode === "split" ? saved.relationMode : "divisor");
-        const restoredSettings = normalizeSettings(saved.settings, savedSize as BoardSize);
-        setSettings(restoredSettings);
-        setDraftSettings(restoredSettings);
-        setSetupOpen(saved.setupOpen ?? true);
-        setGameOver(saved.gameOver ?? false);
-        setWinner(saved.winner === 1 || saved.winner === 2 ? saved.winner : 0);
-        setMoveNumber(saved.moveNumber ?? 1);
-        setElapsed(saved.elapsed ?? 0);
-        setCaptures(saved.captures ?? [0, 0]);
-        setBombs(saved.bombs ?? [2, 2]);
-        setBombCharge(saved.bombCharge ?? [0, 0]);
-        setBombArmed(saved.bombArmed ?? false);
-        setHistory(saved.history ?? []);
-
-        const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-        if (navigation?.type === "reload" && saved.setupOpen === false && !saved.gameOver) {
-          setRestartReason("refresh");
-          setRestartPromptOpen(true);
-        }
-      }
-    } catch {
-      window.sessionStorage.removeItem(SAVED_GAME_KEY);
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
-
-  const clearSequenceTimers = useCallback(() => {
-    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
-    sequenceTimers.current = [];
+    const progress = loadProgress();
+    setCompleted(progress);
+    setSelectedStageId(Math.min(11, Math.max(1, progress.length ? Math.max(...progress) + 1 : 1)));
+    setHydrated(true);
+    return () => timers.current.forEach((timer) => window.clearTimeout(timer));
   }, []);
 
   const schedule = useCallback((callback: () => void, delay: number) => {
     const timer = window.setTimeout(callback, delay);
-    sequenceTimers.current.push(timer);
-    return timer;
+    timers.current.push(timer);
   }, []);
 
-  const scores = useMemo(() => score(board), [board]);
-  const boardSize = getBoardSize(board);
-  const emptyCount = board.filter((cell) => cell === 0).length;
-  const selectedMoves = useMemo(
-    () => selected === null ? [] : legalMoves(board, currentPlayer).filter((move) =>
-      move.from === selected
-      && (relationMode !== "split" || (move.distance === 1 && factorPairs(numbers[selected] ?? 0).length > 0)),
-    ),
-    [board, currentPlayer, numbers, relationMode, selected],
-  );
-  const targetMap = useMemo(() => new Map(selectedMoves.map((move) => [move.to, move])), [selectedMoves]);
-
-  const previewComparisons = useMemo(() => {
-    const result = new Map<number, { passes: boolean; label: string }>();
-    if (hovered === null || selected === null || !targetMap.has(hovered)) return result;
-    const attackerNumber = numbers[selected];
-    if (attackerNumber === null) return result;
-    if (relationMode === "split" && !bombArmed) return result;
-    const row = Math.floor(hovered / boardSize);
-    const col = hovered % boardSize;
-    for (let y = Math.max(0, row - 1); y <= Math.min(boardSize - 1, row + 1); y += 1) {
-      for (let x = Math.max(0, col - 1); x <= Math.min(boardSize - 1, col + 1); x += 1) {
-        const index = y * boardSize + x;
-        const targetNumber = numbers[index];
-        if (board[index] !== 0 && board[index] !== currentPlayer && targetNumber !== null) {
-          const passes = bombArmed || isRelation(attackerNumber, targetNumber, relationMode);
-          const label = bombArmed
-            ? "세균탄"
-            : relationMode === "divisor"
-            ? `${attackerNumber} → ${targetNumber}`
-            : `${attackerNumber} ← ${targetNumber}`;
-          result.set(index, { passes, label });
-        }
-      }
-    }
-    return result;
-  }, [board, boardSize, bombArmed, currentPlayer, hovered, numbers, relationMode, selected, targetMap]);
-
-  const playTone = useCallback((kind: "move" | "infect" | "win" | "select") => {
-    if (!soundOn || typeof window === "undefined") return;
-    const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtor) return;
-    const context = audioRef.current ?? new AudioCtor();
-    audioRef.current = context;
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    const frequencies = { select: 420, move: 280, infect: 160, win: 620 };
-    oscillator.type = kind === "infect" ? "sawtooth" : "sine";
-    oscillator.frequency.setValueAtTime(frequencies[kind], context.currentTime);
-    if (kind === "win") oscillator.frequency.exponentialRampToValueAtTime(980, context.currentTime + 0.22);
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.09, context.currentTime + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + (kind === "win" ? 0.32 : 0.16));
-    oscillator.connect(gain).connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + (kind === "win" ? 0.34 : 0.18));
-  }, [soundOn]);
-
-  const resolveEnd = useCallback((nextBoard: Cell[], lastPlayer: Player, nextPlayer: Player) => {
-    const nextScores = score(nextBoard);
-    const nextMoves = legalMoves(nextBoard, nextPlayer);
-    const lastMoves = legalMoves(nextBoard, lastPlayer);
-    const isFull = !nextBoard.includes(0);
-    if (nextScores.includes(0) || isFull || (!nextMoves.length && !lastMoves.length)) {
-      const result = nextScores[0] === nextScores[1] ? 0 : nextScores[0] > nextScores[1] ? 1 : 2;
-      setWinner(result);
-      setGameOver(true);
-      setThinking(false);
-      setNotice(result === 0 ? "세균 수가 같아요 — 무승부" : `${result === 1 ? "청록" : "코랄"} 팀이 게임판을 더 많이 차지했어요`);
-      window.setTimeout(() => playTone("win"), 140);
-      return;
-    }
-    if (!nextMoves.length) {
-      setCurrentPlayer(lastPlayer);
-      setNotice(`${nextPlayer === 1 ? "청록" : "코랄"} 팀은 움직일 수 없어 차례를 넘겨요`);
-    } else {
-      setCurrentPlayer(nextPlayer);
-      setNotice(nextPlayer === 1 ? "청록 팀 차례예요" : settings.mode === "ai" ? "컴퓨터가 다음 수를 생각하고 있어요" : "코랄 팀 차례예요");
-    }
-  }, [playTone, settings.mode]);
-
-  const executeMove = useCallback((move: Move, player: Player, mode: RelationMode = relationMode, useBomb = false) => {
-    if (gameOver || animating || restartPromptOpen) return;
-    clearSequenceTimers();
-    setAnimating(true);
-    setHistory((previous) => [...previous, {
-      board: [...board],
-      numbers: [...numbers],
-      player: currentPlayer,
-      move: moveNumber,
-      captures: [...captures] as [number, number],
-      bombs: [...bombs] as [number, number],
-      bombCharge: [...bombCharge] as [number, number],
-      relationMode,
-    }]);
-    const result = applyMove(board, numbers, player, move, mode, { forceInfection: useBomb });
-    const bombUsed = useBomb && result.infected.length > 0;
-    const chargeCompleted = bombCharge[player - 1] >= 4;
-    setBombCharge((value) => {
-      const next: [number, number] = [...value] as [number, number];
-      next[player - 1] = chargeCompleted ? 0 : next[player - 1] + 1;
+  const persistCompletion = useCallback((stageId: number) => {
+    if (freeBattle) return;
+    setCompleted((previous) => {
+      const next = previous.includes(stageId) ? previous : [...previous, stageId].sort((a, b) => a - b);
+      window.localStorage.setItem(STORY_SAVE_KEY, JSON.stringify(next));
       return next;
     });
-    if (chargeCompleted) {
-      setChargeBurst(player);
-      schedule(() => setChargeBurst(null), 480);
-    }
-    if (bombUsed || chargeCompleted) {
-      setBombs((value) => {
-        const next: [number, number] = [...value] as [number, number];
-        next[player - 1] = Math.max(0, next[player - 1] - (bombUsed ? 1 : 0)) + (chargeCompleted ? 1 : 0);
-        return next;
-      });
-    }
-    setBombArmed(false);
-    const opponent: Player = player === 1 ? 2 : 1;
-    const movedBoard = [...result.board];
-    const movedNumbers = [...result.numbers];
-    result.infected.forEach((index) => { movedBoard[index] = opponent; });
-    result.infected.forEach((index) => { movedNumbers[index] = numbers[index]; });
-    setBoard(movedBoard);
-    setNumbers(movedNumbers);
-    setSelected(null);
-    setHovered(null);
-    setResisted([]);
-    setMoveNumber((value) => value + 1);
-    setArrived(move.to);
-    playTone("move");
-    schedule(() => setArrived(null), 500);
-    const activeModeLabel = modeLabel(mode);
-    const infectionRuleLabel = mode === "split"
-      ? `${result.spawnedNumber}의 배수`
-      : activeModeLabel;
-    const spawnLabel = move.distance === 1
-      ? mode === "split"
-        ? `${result.attackerNumber} = ${result.parentNumber} × ${result.spawnedNumber} · 부모와 새 세균의 수가 나뉘었어요`
-        : mode === "divisor" && result.spawnedNumber === result.attackerNumber
-        ? `${result.attackerNumber}은(는) 1 말고 다른 약수가 없어 같은 수로 새 세균을 만들었어요`
-        : `${result.attackerNumber}의 ${activeModeLabel}인 ${result.spawnedNumber}번 새 세균을 만들었어요`
-      : `${result.attackerNumber}번 세균이 두 칸 이동했어요`;
-    const chargeLabel = chargeCompleted ? " · 세균탄 1개를 받았어요" : "";
-    if (result.infected.length) {
-      setNotice(bombUsed
-        ? `${spawnLabel} · 세균탄은 숫자 조건 없이 사용할 수 있어요`
-        : `${spawnLabel} · 주변 숫자에 ${infectionRuleLabel}가 있는지 확인해요`);
-      schedule(() => {
-        setProjectiles(result.infected.map((to, id) => ({ id, from: move.to, to, player, bomb: bombUsed })));
-        setResisted(result.resisted);
-        setNotice(bombUsed
-          ? `세균탄으로 주변 상대 세균 ${result.infected.length}개를 감염시켜요`
-          : `숫자 조건이 맞는 세균 ${result.infected.length}개에 감염탄을 쏴요`);
-      }, 260);
-      schedule(() => {
-        setBoard(result.board);
-        setNumbers(result.numbers);
-        setInfection({ cells: result.infected, player });
-        setCaptures((value) => {
-          const next: [number, number] = [...value] as [number, number];
-          next[player - 1] += result.infected.length;
-          return next;
-        });
-        setNotice(`상대 세균 ${result.infected.length}개가 내 편이 되었어요${chargeLabel}`);
-        playTone("infect");
-      }, 820);
-      schedule(() => {
-        setInfection(null);
-        setProjectiles([]);
-        setResisted([]);
-        setAnimating(false);
-        resolveEnd(result.board, player, opponent);
-      }, 1580);
-    } else {
-      setResisted(result.resisted);
-      const resultNotice = useBomb && !bombUsed
-        ? `${spawnLabel} · 감염할 상대가 없어 세균탄을 쓰지 않았어요`
-        : result.resisted.length
-        ? `${spawnLabel} · 주변 숫자에 ${infectionRuleLabel}가 없어 감염되지 않았어요`
-        : `${spawnLabel} · 바로 옆에 상대 세균이 없어요`;
-      setNotice(`${resultNotice}${chargeLabel}`);
-      schedule(() => {
-        setResisted([]);
-        setAnimating(false);
-        resolveEnd(result.board, player, opponent);
-      }, result.resisted.length ? 1050 : 560);
-    }
-  }, [animating, board, bombCharge, bombs, captures, clearSequenceTimers, currentPlayer, gameOver, moveNumber, numbers, playTone, relationMode, resolveEnd, restartPromptOpen, schedule]);
+  }, [freeBattle]);
 
-  useEffect(() => {
-    if (setupOpen || restartPromptOpen || gameOver || animating || settings.mode !== "ai" || currentPlayer !== 2) {
-      setThinking(false);
+  const beginBattle = useCallback((stage: StoryStage, free = false) => {
+    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current = [];
+    setFreeBattle(free);
+    setBattleStageId(stage.id);
+    setBattle(createStoryBattle(stage));
+    setRelationMode(stage.modes[0]);
+    setSelectedCell(null);
+    setHoveredCell(null);
+    setTurn(1);
+    setBusy(false);
+    setMoveCount(0);
+    setResult(null);
+    setFlash({ infected: [], resisted: [] });
+    setFeedback(`${MODE_COPY[stage.modes[0]].label} 준비 완료. ${stage.mission}`);
+    setView("battle");
+  }, []);
+
+  const startSelectedStage = useCallback(() => {
+    if (selectedStage.id === 1 && !completed.includes(1)) {
+      setCinematic("opening");
       return;
     }
-    setThinking(true);
-    setNotice("컴퓨터가 게임판을 살펴보고 있어요");
-    const action = chooseAiAction(board, numbers, settings.difficulty, 2, bombs[1]);
-    if (!action) return;
-    const pacing = settings.difficulty === "hard" ? 160 : 0;
-    const selectTimer = window.setTimeout(() => {
-      setSelected(action.move.from);
-      setRelationMode(action.mode);
-      setBombArmed(action.useBomb);
-      playTone("select");
-      setNotice(action.useBomb
-        ? `컴퓨터가 ${numbers[action.move.from]}번 세균에 세균탄을 골랐어요`
-        : `컴퓨터가 ${numbers[action.move.from]}번 세균과 ${modeLabel(action.mode)} 모드를 골랐어요`);
-    }, 420 + pacing);
-    const targetTimer = window.setTimeout(() => {
-      setHovered(action.move.to);
-      setNotice(action.useBomb
-        ? "컴퓨터가 세균탄으로 감염할 곳을 확인해요"
-        : action.mode === "split"
-          ? "컴퓨터가 어떤 두 수로 나눌지 계산해요"
-          : "컴퓨터가 주변 숫자의 약수·배수를 확인해요");
-    }, 900 + pacing);
-    const moveTimer = window.setTimeout(() => {
-      setThinking(false);
-      executeMove(action.move, 2, action.mode, action.useBomb);
-    }, 1360 + pacing);
-    return () => {
-      window.clearTimeout(selectTimer);
-      window.clearTimeout(targetTimer);
-      window.clearTimeout(moveTimer);
-    };
-  }, [animating, board, bombs, currentPlayer, executeMove, gameOver, numbers, playTone, restartPromptOpen, settings, setupOpen]);
+    beginBattle(selectedStage);
+  }, [beginBattle, completed, selectedStage]);
 
-  useEffect(() => () => clearSequenceTimers(), [clearSequenceTimers]);
+  const finishBattle = useCallback((stage: StoryStage) => {
+    persistCompletion(stage.id);
+    setBusy(false);
+    setTurn(1);
+    if (stage.id === 11 && !freeBattle) {
+      schedule(() => setCinematic("ending"), 850);
+    } else {
+      setResult("clear");
+    }
+  }, [freeBattle, persistCompletion, schedule]);
 
-  useEffect(() => {
-    if (setupOpen || restartPromptOpen || gameOver) return;
-    const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [gameOver, restartPromptOpen, setupOpen]);
+  const resolveAiTurn = useCallback((afterPlayer: StoryBattle) => {
+    let working = afterPlayer;
+    if (battleStage.boss) {
+      const pulse = applyBossPulse(working, battleStage);
+      working = pulse;
+      setBattle(working);
+      if (pulse.relationText) setFeedback(pulse.relationText);
+      setFlash({ infected: pulse.infected, resisted: [] });
+    }
 
-  useEffect(() => {
-    if (!hydrated || animating) return;
-    const saved: SavedGame = {
-      version: 1,
-      board,
-      numbers,
-      currentPlayer,
-      selected,
-      relationMode,
-      settings,
-      setupOpen,
-      gameOver,
-      winner,
-      moveNumber,
-      elapsed,
-      captures,
-      bombs,
-      bombCharge,
-      bombArmed,
-      history,
-    };
-    window.sessionStorage.setItem(SAVED_GAME_KEY, JSON.stringify(saved));
-  }, [animating, board, bombArmed, bombCharge, bombs, captures, currentPlayer, elapsed, gameOver, history, hydrated, moveNumber, numbers, relationMode, selected, settings, setupOpen, winner]);
-
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || setupOpen || gameOver) return;
-      event.preventDefault();
-      setRulesOpen(false);
-      setRestartReason("escape");
-      setRestartPromptOpen(true);
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [gameOver, setupOpen]);
-
-  const startGame = useCallback((nextSettings = draftSettings) => {
-    clearSequenceTimers();
-    const normalizedSettings = normalizeSettings(nextSettings);
-    const freshBoard = createBoard(normalizedSettings.boardSize);
-    setSettings(normalizedSettings);
-    setDraftSettings(normalizedSettings);
-    setBoard(freshBoard);
-    setNumbers(createNumbers(freshBoard));
-    setCurrentPlayer(1);
-    setSelected(null);
-    setHovered(null);
-    setRelationMode("divisor");
-    setThinking(false);
-    setAnimating(false);
-    setGameOver(false);
-    setWinner(0);
-    setMoveNumber(1);
-    setElapsed(0);
-    setCaptures([0, 0]);
-    setBombs([2, 2]);
-    setBombCharge([0, 0]);
-    setChargeBurst(null);
-    setBombArmed(false);
-    setRestartPromptOpen(false);
-    setHistory([]);
-    setInfection(null);
-    setResisted([]);
-    setProjectiles([]);
-    setNotice("내 세균을 고른 뒤 약수·배수·분열 중 하나를 선택하세요");
-    setSetupOpen(false);
-  }, [clearSequenceTimers, draftSettings]);
-
-  const handleCell = (index: number) => {
-    if (gameOver || restartPromptOpen || thinking || animating || (settings.mode === "ai" && currentPlayer === 2)) return;
-    const move = targetMap.get(index);
-    if (move) {
-      executeMove(move, currentPlayer, relationMode, bombArmed);
+    const action = chooseStoryAiMove(working, battleStage);
+    if (!action) {
+      setTurn(1);
+      setBusy(false);
+      setFeedback("질병 세균이 이동할 수 없어요. 치료 작전을 계속하세요.");
       return;
     }
-    if (board[index] === currentPlayer) {
-      if (selected === index) {
-        const nextRelationMode = nextMode(relationMode);
-        setRelationMode(nextRelationMode);
-        setNotice(nextRelationMode === "split" && !factorPairs(numbers[index] ?? 0).length
-          ? `${numbers[index]}은(는) 소수이므로 더 분열할 수 없습니다`
-          : `${numbers[index]}번 세균을 ${modeLabel(nextRelationMode)} 모드로 바꿨어요`);
-      } else {
-        setSelected(index);
-        setBombArmed(false);
-        setRelationMode("divisor");
-        setNotice(`${numbers[index]}번 세균을 골랐어요 — 다시 누르면 배수·분열 모드로 바뀌어요`);
-      }
-      playTone("select");
-    } else {
-      setSelected(null);
-      setBombArmed(false);
+    const enemyResult = applyStoryMove(working, battleStage, 2, action.move, action.mode);
+    setBattle(enemyResult);
+    setFlash({ infected: enemyResult.infected, resisted: enemyResult.resisted });
+    setFeedback(enemyResult.infected.length
+      ? `역감염 발생! ${enemyResult.relationText}`
+      : `질병 세균의 공격을 막았어요. ${enemyResult.relationText}`);
+    setMoveCount((value) => value + 1);
+    if (!enemyResult.board.includes(1)) {
+      setResult("failed");
+      setBusy(false);
+      return;
     }
+    schedule(() => {
+      setFlash({ infected: [], resisted: [] });
+      setTurn(1);
+      setBusy(false);
+    }, 650);
+  }, [battleStage, schedule]);
+
+  const executePlayerMove = useCallback((move: Move) => {
+    setBusy(true);
+    setSelectedCell(null);
+    const next = applyStoryMove(battle, battleStage, 1, move, relationMode);
+    setBattle(next);
+    setFlash({ infected: next.infected, resisted: next.resisted });
+    setFeedback(next.infected.length || next.bossHit ? next.relationText : `감염 조건 불일치. ${next.relationText}`);
+    setMoveCount((value) => value + 1);
+    if (!next.board.includes(2)) {
+      finishBattle(battleStage);
+      return;
+    }
+    setTurn(2);
+    schedule(() => resolveAiTurn(next), battleStage.boss ? 1050 : 800);
+  }, [battle, battleStage, finishBattle, relationMode, resolveAiTurn, schedule]);
+
+  const handleCell = useCallback((index: number) => {
+    if (busy || turn !== 1 || result) return;
+    if (battle.board[index] === 1) {
+      setSelectedCell(index);
+      setFeedback(`${battle.numbers[index]} 치료 세균 선택 · 빈 칸으로 1칸 복제하거나 2칸 이동하세요.`);
+      return;
+    }
+    if (selectedCell === null || battle.board[index] !== 0) return;
+    const distance = getDistance(selectedCell, index, 7);
+    if (distance !== 1 && distance !== 2) return;
+    if (relationMode === "split" && distance === 1 && factorPairs(battle.numbers[selectedCell] ?? 0).length === 0) {
+      setFeedback("이 수는 두 자연수의 곱으로 분열할 수 없어요. 다른 치료 세균을 골라 보세요.");
+      return;
+    }
+    executePlayerMove({ from: selectedCell, to: index, distance });
+  }, [battle.board, battle.numbers, busy, executePlayerMove, relationMode, result, selectedCell, turn]);
+
+  const chooseMode = (mode: RelationMode) => {
+    if (!battleStage.modes.includes(mode) || busy) return;
+    setRelationMode(mode);
+    setSelectedCell(null);
+    setFeedback(`${MODE_COPY[mode].label}: ${MODE_COPY[mode].explanation}`);
   };
 
-  const undo = () => {
-    if (!history.length || restartPromptOpen || thinking || animating) return;
-    const steps = settings.mode === "ai" ? Math.min(2, history.length) : 1;
-    const snapshot = history[history.length - steps];
-    setBoard(snapshot.board);
-    setNumbers(snapshot.numbers);
-    setCurrentPlayer(snapshot.player);
-    setRelationMode(snapshot.relationMode);
-    setMoveNumber(snapshot.move);
-    setCaptures(snapshot.captures);
-    setBombs(snapshot.bombs ?? [2, 2]);
-    setBombCharge(snapshot.bombCharge ?? [0, 0]);
-    setChargeBurst(null);
-    setBombArmed(false);
-    setHistory((value) => value.slice(0, -steps));
-    setGameOver(false);
-    setWinner(0);
-    setSelected(null);
-    setInfection(null);
-    setResisted([]);
-    setProjectiles([]);
-    setNotice("한 수 전으로 되돌렸어요");
+  const returnToMap = () => {
+    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current = [];
+    const nextStage = Math.min(11, Math.max(...completed, battleStage.id) + 1);
+    setSelectedStageId(nextStage);
+    setView("map");
+    setResult(null);
+    setBusy(false);
+    setFreeBattle(false);
   };
 
-  const playerTwoName = settings.mode === "ai" ? "컴퓨터" : "플레이어 2";
-  const activeName = currentPlayer === 1 ? "플레이어 1" : playerTwoName;
-  const gameLabel = settings.mode === "ai"
-    ? `컴퓨터 · ${DIFFICULTY[settings.difficulty].label} · ${boardSize}×${boardSize}`
-    : `친구와 하기 · ${boardSize}×${boardSize}`;
-  const displayedCharge: [number, number] = [
-    chargeBurst === 1 ? 5 : bombCharge[0],
-    chargeBurst === 2 ? 5 : bombCharge[1],
-  ];
+  const handleCinematicFinish = useCallback(() => {
+    if (cinematic === "opening") {
+      setCinematic(null);
+      beginBattle(STORY_STAGES[0]);
+    } else {
+      setCinematic(null);
+      setResult(null);
+      setView("map");
+      setSelectedStageId(11);
+    }
+  }, [beginBattle, cinematic]);
+
+  const remainingDisease = battle.board.filter((cell) => cell === 2).length;
+  const therapyCount = battle.board.filter((cell) => cell === 1).length;
+  const selectedNumber = selectedCell === null ? null : battle.numbers[selectedCell];
+  const hoverNumber = hoveredCell === null ? null : battle.numbers[hoveredCell];
+  const liveComparison = selectedNumber && hoverNumber && battle.board[hoveredCell ?? 0] === 2
+    ? relationMode === "divisor"
+      ? `${selectedNumber} ÷ ${hoverNumber}${selectedNumber % hoverNumber === 0 ? ` = ${selectedNumber / hoverNumber}` : " → 나머지 있음"}`
+      : relationMode === "multiple"
+        ? `${hoverNumber} ÷ ${selectedNumber}${hoverNumber % selectedNumber === 0 ? ` = ${hoverNumber / selectedNumber}` : " → 나머지 있음"}`
+        : "분열 후 새 수의 배수인지 확인"
+    : null;
+
+  if (!hydrated) return <main className="story-app loading-screen"><div className="loader-germ">∴</div><p>치료 세균을 배양하는 중...</p></main>;
 
   return (
-    <main className={`app-shell board-size-${boardSize}`}>
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
-
-      <header className="topbar">
-        <button className="brand" onClick={() => setSetupOpen(true)} aria-label="게임 모드 선택 열기">
-          <span className="brand-mark"><i /><i /><i /></span>
-          <span><strong>페트리</strong><small>// 07</small></span>
+    <main className="story-app">
+      <header className="command-header">
+        <button className="brand" onClick={() => setView("map")} aria-label="세계 작전 지도로 이동">
+          <span className="brand-mark">ƒ</span>
+          <span><b>FACTOR FORCE</b><small>약수와 배수 지구 방어대</small></span>
         </button>
-        <div className="topbar-center">
-          <span className="live-dot" />
-          <span>게임 시간</span>
-          <b>{formatTime(elapsed)}</b>
-        </div>
-        <nav className="top-actions" aria-label="게임 메뉴">
-          <button onClick={() => setSoundOn((value) => !value)} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "◖))" : "◖×"}</button>
-          <button onClick={() => setRulesOpen(true)} aria-label="게임 규칙 보기">?</button>
-          <button className="mode-button" onClick={() => setSetupOpen(true)}><span>{gameLabel}</span><b>변경</b></button>
+        <nav aria-label="게임 모드">
+          <button className={view === "map" && !freeBattle ? "active" : ""} onClick={() => { setView("map"); setFreeBattle(false); }}>스토리 작전</button>
+          <button className={freeBattle ? "active" : ""} onClick={() => beginBattle(STORY_STAGES[9], true)}>자유 대전</button>
         </nav>
+        <div className="global-progress">
+          <div><span>지구 해방률</span><b>{Math.round((completed.length / 11) * 100)}%</b></div>
+          <i><em style={{ width: `${(completed.length / 11) * 100}%` }} /></i>
+        </div>
       </header>
 
-      <section className="status-rail" aria-live="polite">
-        <div className={`turn-beacon p${currentPlayer}`}><span>{thinking ? "생각 중" : currentPlayer === 1 ? "청록" : "코랄"}</span></div>
-        <div className="status-copy">
-          <small>턴 {String(moveNumber).padStart(2, "0")} · {activeName}</small>
-          <strong>{notice}</strong>
-        </div>
-        <div className="coverage">
-          <span>채운 칸</span>
-          <b>{Math.round(((board.length - emptyCount) / board.length) * 100)}%</b>
-          <i><em style={{ width: `${((board.length - emptyCount) / board.length) * 100}%` }} /></i>
-        </div>
-      </section>
-
-      <section className="game-layout">
-        <aside className={`player-panel cyan ${currentPlayer === 1 && !gameOver ? "active" : ""}`}>
-          <div className="player-topline"><span>청록 팀</span><i>● 준비됨</i></div>
-          <div className="portrait"><Germ player={1} /><span className="scanline" /></div>
-          <div className="identity"><small>내 세균</small><h2>플레이어 1</h2></div>
-          <div className="score-block"><small>세균 수</small><strong>{String(scores[0]).padStart(2, "0")}</strong></div>
-          <div className="player-metrics">
-            <span><small>감염</small><b>+{captures[0]}</b></span>
-            <span><small>이동 가능</small><b>{legalMoves(board, 1).length}</b></span>
-            <span><small>세균탄</small><b>×{bombs[0]}</b></span>
-          </div>
-        </aside>
-
-        <section className="board-stage">
-          <div className="petri-frame">
-            <div className="frame-label top"><span>게임판</span><b>{String(boardSize).padStart(2, "0")} × {String(boardSize).padStart(2, "0")}</b></div>
-            <div className="board-wrap">
-              <div className="board-grid" data-size={boardSize} style={{ "--board-size": boardSize } as CSSProperties} role="grid" aria-label={`${boardSize} × ${boardSize} 세균전 게임판`}>
-                {board.map((cell, index) => {
-                  const move = targetMap.get(index);
-                  const isInfected = infection?.cells.includes(index) ?? false;
-                  const comparison = previewComparisons.get(index);
-                  const isResisted = resisted.includes(index);
-                  const row = Math.floor(index / boardSize) + 1;
-                  const col = index % boardSize + 1;
-                  return (
-                    <button
-                      key={index}
-                      className={[
-                        "cell",
-                        cell ? `occupied p${cell}` : "empty",
-                        selected === index ? "selected" : "",
-                        move ? `legal ${move.distance === 1 ? "clone" : "jump"}` : "",
-                        comparison?.passes ? "will-infect" : "",
-                        comparison && !comparison.passes ? "relation-blocked" : "",
-                        isResisted ? "resisted" : "",
-                        arrived === index ? "arrived" : "",
-                        isInfected ? "hit" : "",
-                      ].filter(Boolean).join(" ")}
-                      onClick={() => handleCell(index)}
-                      onMouseEnter={() => move && setHovered(index)}
-                      onMouseLeave={() => setHovered(null)}
-                      role="gridcell"
-                      aria-label={`${row}행 ${col}열, ${cell === 0 ? move ? move.distance === 1 ? "새 세균 만들기 가능" : "두 칸 이동 가능" : "빈 칸" : `${cell === 1 ? "청록" : "코랄"} ${numbers[index]}번 세균`}`}
-                    >
-                      <span className="cell-gridmark" />
-                      {cell !== 0 && (
-                        <Germ
-                          player={cell}
-                          infection={isInfected}
-                          number={numbers[index] ?? undefined}
-                          mode={selected === index ? relationMode : undefined}
-                        />
-                      )}
-                      {move && <span className="move-hint"><i />{move.distance === 1 ? "+" : "↗"}</span>}
-                      {bombArmed && selected === index && <span className="bomb-equipped" aria-hidden="true">✹</span>}
-                      {comparison?.passes && <span className="preview-ring" />}
-                      {comparison && <span className={`comparison-badge ${comparison.passes ? "pass" : "fail"}`}>{comparison.label} {comparison.passes ? "✓" : "×"}</span>}
-                      {isResisted && <span className="resist-mark">관계 없음</span>}
-                    </button>
-                  );
-                })}
-                {projectiles.length > 0 && (
-                  <div className="infection-projectile-layer" aria-hidden="true">
-                    {projectiles.map((projectile) => {
-                      const fromRow = Math.floor(projectile.from / boardSize);
-                      const fromCol = projectile.from % boardSize;
-                      const toRow = Math.floor(projectile.to / boardSize);
-                      const toCol = projectile.to % boardSize;
-                      return (
-                        <span
-                          key={`${projectile.from}-${projectile.to}-${projectile.id}`}
-                          className={`infection-projectile p${projectile.player} ${projectile.bomb ? "bomb" : ""}`}
-                          style={{
-                            "--sx": `${((fromCol + .5) / boardSize) * 100}%`,
-                            "--sy": `${((fromRow + .5) / boardSize) * 100}%`,
-                            "--ex": `${((toCol + .5) / boardSize) * 100}%`,
-                            "--ey": `${((toRow + .5) / boardSize) * 100}%`,
-                            "--delay": `${projectile.id * 45}ms`,
-                          } as CSSProperties}
-                        ><i /></span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+      {view === "map" ? (
+        <div className="map-layout">
+          <section className="mission-brief">
+            <small className="eyebrow">GLOBAL RESPONSE // 2042</small>
+            <h1>숫자 감염으로부터<br /><em>지구를 해방하라</em></h1>
+            <p>약수와 배수의 관계를 활용해 치료 세균을 복제하고, 대륙마다 퍼진 질병 세균을 모두 역감염시키세요.</p>
+            <div className="brief-stats">
+              <div><b>{completed.length}</b><span>해방 지역</span></div>
+              <div><b>{11 - completed.length}</b><span>남은 작전</span></div>
+              <div><b>{completed.includes(11) ? "안정" : "위험"}</b><span>지구 상태</span></div>
             </div>
-          </div>
-
-          <div className="board-controls">
-            <button onClick={undo} disabled={!history.length || thinking || animating}><span>↶</span> 되돌리기</button>
-            <div className="tactic-controls">
-              {selected !== null ? (
-                <button className={`relation-readout ${relationMode}`} onClick={() => handleCell(selected)}>
-                  <span>{numbers[selected]}</span>
-                  <b>{modeLabel(relationMode)} 모드</b>
-                  <small>다시 눌러 바꾸기</small>
-                </button>
-              ) : (
-                <div className="legend"><span><i className="clone-dot" />1칸 새 세균</span><span><i className="jump-dot" />2칸 이동</span></div>
-              )}
-              <button
-                className={`bacteria-bomb ${bombArmed ? "armed" : ""}`}
-                disabled={selected === null || bombs[currentPlayer - 1] === 0 || thinking || animating}
-                onClick={() => {
-                  const next = !bombArmed;
-                  setBombArmed(next);
-                  setNotice(next
-                    ? `${numbers[selected ?? 0]}번 세균이 세균탄을 쓸 준비를 했어요 — 다음에는 숫자 조건 없이 감염돼요`
-                    : "세균탄 사용을 취소했어요");
-                  playTone("select");
-                }}
-                aria-pressed={bombArmed}
-              >
-                <i>✹</i><span><b>세균탄</b><small>{bombArmed ? "사용 준비" : "조건 없이 감염"}</small></span><em>×{bombs[currentPlayer - 1]}</em>
-              </button>
+            <div className="transmission-log">
+              <span className="pulse-dot" />
+              <div><small>연구소 통신</small><p>{completed.length === 0 ? "서울 연구소에서 치료 세균 배양 완료. 첫 작전을 승인합니다." : completed.includes(11) ? "전 세계 감염 신호 소멸. 지구 생태계가 정상화되었습니다." : `${unlocked}번 감염 지역의 구조 요청을 수신했습니다.`}</p></div>
             </div>
-            <button onClick={() => {
-              setRestartReason("manual");
-              setRestartPromptOpen(true);
-            }}><span>↻</span> 새 게임</button>
-          </div>
-        </section>
-
-        <aside className={`player-panel coral ${currentPlayer === 2 && !gameOver ? "active" : ""}`}>
-          <div className="player-topline"><span>코랄 팀</span><i>● {settings.mode === "ai" ? "컴퓨터" : "준비됨"}</i></div>
-          <div className="portrait"><Germ player={2} /><span className="scanline" /></div>
-          <div className="identity"><small>{settings.mode === "ai" ? "컴퓨터 세균" : "상대 세균"}</small><h2>{playerTwoName}</h2></div>
-          <div className="score-block"><small>세균 수</small><strong>{String(scores[1]).padStart(2, "0")}</strong></div>
-          <div className="player-metrics">
-            <span><small>감염</small><b>+{captures[1]}</b></span>
-            <span><small>{settings.mode === "ai" ? "난이도" : "이동 가능"}</small><b>{settings.mode === "ai" ? DIFFICULTY[settings.difficulty].label : legalMoves(board, 2).length}</b></span>
-            <span><small>세균탄</small><b>×{bombs[1]}</b></span>
-          </div>
-        </aside>
-      </section>
-
-      <section className="charge-dock" aria-label="세균탄 모으기">
-        <div className={`charge-unit p1 ${currentPlayer === 1 && !gameOver ? "active" : ""} ${chargeBurst === 1 ? "charged" : ""}`}>
-          <div className="charge-heading"><span><i /> 플레이어 1</span><b>세균탄 ×{bombs[0]}</b></div>
-          <div className="charge-track" role="progressbar" aria-label="플레이어 1 세균탄 모으기" aria-valuemin={0} aria-valuemax={5} aria-valuenow={displayedCharge[0]}>
-            <em style={{ width: `${(displayedCharge[0] / 5) * 100}%` }} />
-            {[1, 2, 3, 4].map((tick) => <i key={tick} style={{ left: `${tick * 20}%` }} />)}
-          </div>
-          <small>{chargeBurst === 1 ? "충전 완료 · +1" : `${bombCharge[0]} / 5 개인 턴`}</small>
-        </div>
-        <div className="charge-core"><span>✹</span><b>자동 충전</b><small>5턴마다 세균탄 +1</small></div>
-        <div className={`charge-unit p2 ${currentPlayer === 2 && !gameOver ? "active" : ""} ${chargeBurst === 2 ? "charged" : ""}`}>
-          <div className="charge-heading"><span><i /> {playerTwoName}</span><b>세균탄 ×{bombs[1]}</b></div>
-          <div className="charge-track" role="progressbar" aria-label="플레이어 2 세균탄 모으기" aria-valuemin={0} aria-valuemax={5} aria-valuenow={displayedCharge[1]}>
-            <em style={{ width: `${(displayedCharge[1] / 5) * 100}%` }} />
-            {[1, 2, 3, 4].map((tick) => <i key={tick} style={{ left: `${tick * 20}%` }} />)}
-          </div>
-          <small>{chargeBurst === 2 ? "충전 완료 · +1" : `${bombCharge[1]} / 5 개인 턴`}</small>
-        </div>
-      </section>
-
-      <footer className="footer-line">
-        <span>페트리 수학 연구소</span><i />
-        <p>약수와 배수를 찾아 상대 세균을 내 편으로 만드세요.</p><i />
-        <span>버전 07.26</span>
-      </footer>
-
-      {setupOpen && (
-        <div className="modal-backdrop">
-          <section className="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title">
-            <div className="setup-hero">
-              <div className="hero-germ cyan-hero"><Germ player={1} /></div>
-              <div className="versus"><h1 id="setup-title">수학 세균전</h1><p>약수·배수·분열로 세균을 늘리는 게임</p></div>
-              <div className="hero-germ coral-hero"><Germ player={2} /></div>
-            </div>
-
-            <div className="mode-tabs">
-              <button className={draftSettings.mode === "ai" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "ai" }))}>
-                <span className="tab-icon">⌁</span><span><b>컴퓨터와 하기</b><small>컴퓨터와 겨뤄요</small></span>
-              </button>
-              <button className={draftSettings.mode === "local" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "local" }))}>
-                <span className="tab-icon">◎</span><span><b>친구와 하기</b><small>한 화면에서 둘이 해요</small></span>
-              </button>
-            </div>
-
-            <div className="board-size-select">
-              <div className="select-heading"><span>게임판 크기</span><small>가로와 세로의 칸 수를 고르세요</small></div>
-              <div className="size-grid">
-                {BOARD_SIZES.map((size) => (
-                  <button
-                    key={size}
-                    className={draftSettings.boardSize === size ? "selected" : ""}
-                    onClick={() => setDraftSettings((value) => ({ ...value, boardSize: size }))}
-                  >
-                    <b>{size} × {size}</b>
-                    <small>{size === 7 ? "빠른 대전" : size === 9 ? "표준 대전" : "대형 대전"}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={`difficulty-select ${draftSettings.mode === "local" ? "disabled" : ""}`}>
-              <div className="select-heading"><span>컴퓨터 난이도</span><small>{draftSettings.mode === "local" ? "친구와 할 때는 사용하지 않아요" : "어려운 정도를 고르세요"}</small></div>
-              <div className="difficulty-grid">
-                {(Object.keys(DIFFICULTY) as Difficulty[]).map((level) => (
-                  <button key={level} disabled={draftSettings.mode === "local"} className={draftSettings.difficulty === level ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, difficulty: level }))}>
-                    <span><b>{DIFFICULTY[level].label}</b><DifficultyBars count={DIFFICULTY[level].bars} /></span>
-                    <small>{DIFFICULTY[level].detail}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button className="launch-button" onClick={() => startGame()}><span>게임 시작</span><i>→</i></button>
-            <button className="rules-link" onClick={() => setRulesOpen(true)}>게임 규칙 보기 <span>?</span></button>
           </section>
-        </div>
-      )}
 
-      {rulesOpen && (
-        <div className="drawer-backdrop" onClick={() => setRulesOpen(false)}>
-          <aside className="rules-drawer" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="rules-title">
-            <button className="drawer-close" onClick={() => setRulesOpen(false)} aria-label="규칙 닫기">×</button>
-            <span className="drawer-kicker">게임 설명 // 01</span>
-            <h2 id="rules-title">게임 방법</h2>
-            <p className="rules-lead">약수와 배수를 찾아 상대 세균을 내 편으로 만드세요.</p>
-            <ol>
-              <li><b>게임판 크기</b><p>게임을 시작할 때 7×7, 9×9, 11×11 중 하나를 고를 수 있어요. 크기가 달라도 게임 방법은 같아요.</p></li>
-              <li><b>나오는 숫자</b><p>시작 세균, 배수로 만든 새 세균, 감염된 세균에는 2부터 100까지의 합성수가 나와요. 합성수는 1과 자기 자신 말고도 약수가 있는 수예요. 약수 모드와 분열 모드에서는 소수도 나올 수 있어요.</p></li>
-              <li><b>구구단 숫자가 나올 확률</b><p>시작 세균과 감염된 세균의 숫자는 90% 확률로 2단부터 9단까지의 구구단 숫자에서 나와요. 나머지 10%는 2부터 100까지의 다른 합성수에서 나와요.</p></li>
-              <li><b>새 세균의 숫자</b><p>약수 모드에서는 고른 세균의 약수 가운데 하나가 나와요. 1과 고른 세균의 수는 빼고 아무거나 하나를 고르며, 소수도 나올 수 있어요. 고를 약수가 없을 때만 같은 수가 나와요. 배수 모드에서는 100 이하인 배수 가운데 하나가 나와요.</p></li>
-              <li><b>감염된 세균의 숫자</b><p>내 편이 된 상대 세균은 새로운 합성수를 받아요. 이때도 구구단 숫자가 먼저 나와요.</p></li>
-              <li><b>모드 바꾸기</b><p>내 세균을 한 번 누르면 선택돼요. 같은 세균을 다시 누를 때마다 약수 → 배수 → 분열 순서로 바뀌어요.</p></li>
-              <li><b>약수 모드</b><p>상대 세균의 숫자가 내가 고른 세균 숫자의 약수이면 감염돼요. 예를 들어 고른 세균이 6이고 상대가 3이면 성공이에요.</p></li>
-              <li><b>배수 모드</b><p>상대 세균의 숫자가 내가 고른 세균 숫자의 배수이면 감염돼요. 예를 들어 고른 세균이 3이고 상대가 6이면 성공이에요.</p></li>
-              <li><b>분열 모드</b><p>한 칸 옆에 새 세균을 만들면 고른 세균의 수를 곱셈식의 두 수로 나눠요. 예를 들어 87 = 3 × 29이면 고른 세균과 새 세균의 수가 3과 29가 돼요. 그다음 새 세균의 숫자를 기준으로 주변에 배수가 있으면 그 상대 세균을 감염시켜요.</p></li>
-              <li><b>세균탄</b><p>각 플레이어는 세균탄 2개를 가지고 시작해요. 내 세균을 고른 뒤 세균탄을 누르면 다음 이동에서 숫자 조건 없이 옆에 있는 상대 세균을 모두 감염시켜요. 감염할 상대가 있을 때만 세균탄 1개를 써요. 내 차례를 5번 마치면 아래쪽 막대가 가득 차고 세균탄 1개를 받아요.</p></li>
-              <li><b>이동과 승리</b><p>한 칸 움직이면 새 세균이 생기고, 두 칸 움직이면 원래 세균이 함께 이동해요. 게임판이 가득 차거나 모두 움직일 수 없을 때 세균이 더 많은 쪽이 이겨요.</p></li>
-            </ol>
-            <button className="drawer-action" onClick={() => setRulesOpen(false)}>이해했습니다</button>
+          <WorldMap selected={selectedStageId} completed={completed} onSelect={setSelectedStageId} />
+          <StagePanel stage={selectedStage} complete={completed.includes(selectedStage.id)} locked={selectedStage.id > unlocked && !completed.includes(selectedStage.id)} onStart={startSelectedStage} />
+        </div>
+      ) : (
+        <div className="battle-layout">
+          <aside className="battle-brief">
+            <button className="back-map" onClick={() => setView("map")}>← 세계 지도</button>
+            <span className="battle-stage-number">{freeBattle ? "FREE" : battleStage.id === 11 ? "BOSS" : `STAGE ${String(battleStage.id).padStart(2, "0")}`}</span>
+            <h1>{freeBattle ? "종합 모의 전투" : battleStage.title}</h1>
+            <p>{battleStage.mission}</p>
+            <div className="objective-card">
+              <small>작전 목표</small>
+              <strong>질병 세균 전멸</strong>
+              <div><span>남은 질병</span><b>{remainingDisease}</b></div>
+              {battleStage.boss && <div><span>보스 내성</span><b>{battle.bossHp} / {battle.bossMaxHp}</b></div>}
+            </div>
+            <div className="lesson-card">
+              <small>{battleStage.lesson}</small>
+              <strong>{battleStage.learning}</strong>
+              <p>{battleStage.example}</p>
+            </div>
+          </aside>
+
+          <section className="battle-center">
+            <div className="battle-statusbar">
+              <div className="unit-count therapy"><span>치료 세균</span><b>{therapyCount}</b></div>
+              <div className={`turn-indicator ${turn === 2 ? "enemy" : ""}`}><i /> {busy ? (turn === 2 ? "질병 세균 변이 중" : "감염 판정 중") : turn === 1 ? "치료 세균 차례" : "질병 세균 차례"}</div>
+              <div className="unit-count disease"><span>질병 세균</span><b>{remainingDisease}</b></div>
+            </div>
+            <BattleBoard battle={battle} stage={battleStage} selected={selectedCell} hovered={hoveredCell} flash={flash} disabled={busy || !!result} onCell={handleCell} onHover={setHoveredCell} />
+            <div className={`feedback-console ${flash.infected.length ? "success" : flash.resisted.length ? "warning" : ""}`}>
+              <span>ƒx</span><p>{liveComparison ?? feedback}</p>
+            </div>
+          </section>
+
+          <aside className="control-panel">
+            <small className="eyebrow">TREATMENT CONTROL</small>
+            <h2>치료 방식 선택</h2>
+            <p>이 스테이지의 학습 내용에 맞는 모드만 사용할 수 있습니다.</p>
+            <div className="mode-buttons">
+              {(Object.keys(MODE_COPY) as RelationMode[]).map((mode) => {
+                const allowed = battleStage.modes.includes(mode);
+                return (
+                  <button key={mode} disabled={!allowed || busy} className={`${relationMode === mode ? "active" : ""} ${!allowed ? "locked" : ""}`} onClick={() => chooseMode(mode)}>
+                    <span>{MODE_COPY[mode].short}</span>
+                    <div><b>{MODE_COPY[mode].label}</b><small>{allowed ? MODE_COPY[mode].explanation : "이번 차시에서는 잠겨 있어요."}</small></div>
+                    <i>{allowed ? relationMode === mode ? "ON" : "선택" : "잠김"}</i>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="how-to-move">
+              <small>조작 방법</small>
+              <ol>
+                <li><span>1</span> 파란 치료 세균을 선택</li>
+                <li><span>2</span> 빛나는 빈 칸으로 이동</li>
+                <li><span>3</span> 주변 숫자 관계를 확인</li>
+              </ol>
+              <p><b>1칸</b> 이동하면 복제 · <b>2칸</b> 이동하면 자리 이동</p>
+            </div>
+            <button className="restart-button" onClick={() => beginBattle(battleStage, freeBattle)}>↻ 이 스테이지 다시 시작</button>
+            <div className="move-counter"><span>작전 턴</span><b>{moveCount}</b></div>
           </aside>
         </div>
       )}
 
-      {restartPromptOpen && !setupOpen && (
-        <div className="modal-backdrop restart-backdrop">
-          <section className="restart-modal" role="alertdialog" aria-modal="true" aria-labelledby="restart-title" aria-describedby="restart-description">
-            <span className="restart-icon" aria-hidden="true">↻</span>
-            <small>다시 시작하기</small>
-            <h2 id="restart-title">게임을 다시 시작할까요?</h2>
-            <p id="restart-description">
-              {restartReason === "refresh"
-                ? "새로고침 전 게임을 그대로 불러왔어요. 새 게임을 시작할지 골라 주세요."
-                : restartReason === "escape"
-                  ? "나가기 키를 눌렀어요. 지금 게임을 이어 하거나 새로 시작할 수 있어요."
-                  : "지금까지 한 내용을 지우고 같은 설정으로 새 게임을 시작해요."}
-            </p>
+      {result && (
+        <div className="result-overlay">
+          <section className={`result-card ${result}`}>
+            <span className="result-symbol">{result === "clear" ? "✓" : "!"}</span>
+            <small>{result === "clear" ? "REGION LIBERATED" : "TREATMENT FAILED"}</small>
+            <h2>{result === "clear" ? `${battleStage.place} 해방 완료` : "치료 세균이 모두 감염됐어요"}</h2>
+            <p>{result === "clear" ? `${battleStage.lesson}의 핵심 개념으로 질병 세균을 모두 제거했습니다.` : "숫자 관계와 모드를 다시 확인하고 재도전하세요."}</p>
             <div>
-              <button className="continue-game" autoFocus onClick={() => setRestartPromptOpen(false)}>이어서 하기</button>
-              <button className="confirm-restart" onClick={() => startGame(settings)}>다시 시작</button>
+              <button onClick={() => beginBattle(battleStage, freeBattle)}>다시 하기</button>
+              <button className="primary" onClick={returnToMap}>{freeBattle ? "스토리 지도로" : battleStage.id < 11 ? "다음 작전 확인" : "세계 지도"} →</button>
             </div>
           </section>
         </div>
       )}
 
-      {gameOver && !setupOpen && (
-        <div className="result-layer">
-          <section className={`result-card ${winner === 2 ? "coral-win" : ""}`}>
-            <span className="result-kicker">게임 끝</span>
-            {winner !== 0 ? <Germ player={winner} /> : <div className="draw-symbol">＝</div>}
-            <h2>{winner === 0 ? "무승부" : `${winner === 1 ? "청록" : "코랄"} 팀 승리`}</h2>
-            <p>{scores[0]} <i>:</i> {scores[1]}</p>
-            <small>{moveNumber - 1}번 움직임 · {formatTime(elapsed)}</small>
-            <div><button onClick={() => startGame(settings)}>다시 하기</button><button onClick={() => setSetupOpen(true)}>설정 바꾸기</button></div>
-          </section>
-        </div>
-      )}
+      {cinematic && <Cinematic kind={cinematic} onFinish={handleCinematicFinish} />}
     </main>
   );
 }
