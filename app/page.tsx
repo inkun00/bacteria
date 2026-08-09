@@ -150,6 +150,10 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
   const [captionIndex, setCaptionIndex] = useState(0);
   const captions = kind === "opening" ? OPENING_CAPTIONS : ENDING_CAPTIONS;
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const sceneImages = kind === "opening"
+    ? ["opening.png", "opening-02.png", "opening-03.png", "opening-04.png"]
+    : ["ending.png"];
+  const sceneImage = sceneImages[Math.min(captionIndex, sceneImages.length - 1)];
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -161,7 +165,7 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
 
   return (
     <div className="cinematic" role="dialog" aria-modal="true" aria-label={kind === "opening" ? "오프닝" : "엔딩"}>
-      <img src={`${basePath}/assets/story/${kind}.png`} alt="" />
+      <img key={`${kind}-${captionIndex}`} src={`${basePath}/assets/story/${sceneImage}`} alt="" />
       <div className="cinematic-vignette" />
       <div className="cinematic-topline">
         <span>{kind === "opening" ? "FACTOR FORCE · PROLOGUE" : "FACTOR FORCE · EPILOGUE"}</span>
