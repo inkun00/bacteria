@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Factor Force | 약수와 배수 지구 방어대",
-    description: "11개 세계 작전에서 약수와 배수를 배우고 지구를 해방하세요.",
+    description: "10개 세계 작전에서 2~10차시의 약수와 배수를 배우고 지구를 해방하세요.",
     images: [`${basePath}/og.png`],
     type: "website",
   },

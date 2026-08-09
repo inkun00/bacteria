@@ -15,7 +15,11 @@ import {
   type StoryStage,
 } from "./story";
 
-const STORY_SAVE_KEY = "factor-force-story-progress-v1";
+const STORY_SAVE_KEY = "factor-force-story-progress-v2";
+const LEGACY_STORY_SAVE_KEY = "factor-force-story-progress-v1";
+const STORY_STAGE_COUNT = STORY_STAGES.length;
+const BOSS_STAGE_ID = STORY_STAGES[STORY_STAGE_COUNT - 1].id;
+const FREE_BATTLE_STAGE = STORY_STAGES[STORY_STAGE_COUNT - 2];
 
 const OPENING_CAPTIONS = [
   "서기 2042년, 숫자를 바꾸며 증식하는 질병 세균이 지구 전역에 나타났다.",
@@ -38,8 +42,20 @@ type CinematicKind = "opening" | "ending";
 function loadProgress() {
   if (typeof window === "undefined") return [] as number[];
   try {
-    const value = JSON.parse(window.localStorage.getItem(STORY_SAVE_KEY) ?? "[]");
-    return Array.isArray(value) ? value.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= 11) : [];
+    const current = window.localStorage.getItem(STORY_SAVE_KEY);
+    if (current !== null) {
+      const value = JSON.parse(current);
+      return Array.isArray(value) ? value.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= STORY_STAGE_COUNT) : [];
+    }
+
+    const legacy = JSON.parse(window.localStorage.getItem(LEGACY_STORY_SAVE_KEY) ?? "[]");
+    const migrated = Array.isArray(legacy)
+      ? legacy
+        .filter((id): id is number => Number.isInteger(id) && id >= 2 && id <= STORY_STAGE_COUNT + 1)
+        .map((id) => id - 1)
+      : [];
+    window.localStorage.setItem(STORY_SAVE_KEY, JSON.stringify(migrated));
+    return migrated;
   } catch {
     return [];
   }
@@ -123,7 +139,7 @@ function WorldMap({
   completed: number[];
   onSelect: (id: number) => void;
 }) {
-  const unlocked = Math.min(11, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
+  const unlocked = Math.min(STORY_STAGE_COUNT, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
   return (
     <section className="world-map" aria-label="세계 감염 지도">
       <div className="map-grid" />
@@ -146,7 +162,7 @@ function WorldMap({
             aria-label={`${stage.id} 스테이지 ${stage.title}${isUnlocked ? "" : " 잠김"}`}
           >
             <span>{isComplete ? "✓" : isUnlocked ? stage.id : "⌁"}</span>
-            <em>{stage.id === 11 ? "BOSS" : stage.place.split(" · ")[1]}</em>
+            <em>{stage.id === BOSS_STAGE_ID ? "BOSS" : stage.place.split(" · ")[1]}</em>
           </button>
         );
       })}
@@ -169,7 +185,7 @@ function StagePanel({
   return (
     <aside className="stage-panel">
       <div className="stage-panel-head">
-        <span className="stage-number">{stage.id === 11 ? "BOSS" : `0${stage.id}`.slice(-2)}</span>
+        <span className="stage-number">{stage.id === BOSS_STAGE_ID ? "BOSS" : `0${stage.id}`.slice(-2)}</span>
         <div><small>{stage.lesson}</small><h2>{stage.title}</h2></div>
       </div>
       <div className="location-line"><i>⌖</i> {stage.place} <span>{stage.continent}</span></div>
@@ -304,12 +320,12 @@ export default function Home() {
 
   const selectedStage = STORY_STAGES[selectedStageId - 1];
   const battleStage = STORY_STAGES[battleStageId - 1];
-  const unlocked = Math.min(11, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
+  const unlocked = Math.min(STORY_STAGE_COUNT, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
 
   useEffect(() => {
     const progress = loadProgress();
     setCompleted(progress);
-    setSelectedStageId(Math.min(11, Math.max(1, progress.length ? Math.max(...progress) + 1 : 1)));
+    setSelectedStageId(Math.min(STORY_STAGE_COUNT, Math.max(1, progress.length ? Math.max(...progress) + 1 : 1)));
     setHydrated(true);
     return () => timers.current.forEach((timer) => window.clearTimeout(timer));
   }, []);
@@ -366,7 +382,7 @@ export default function Home() {
     persistCompletion(stage.id);
     setBusy(false);
     setTurn(1);
-    if (stage.id === 11 && !freeBattle) {
+    if (stage.id === BOSS_STAGE_ID && !freeBattle) {
       schedule(() => setCinematic("ending"), 850);
     } else {
       setResult("clear");
@@ -460,7 +476,7 @@ export default function Home() {
   const returnToMap = () => {
     timers.current.forEach((timer) => window.clearTimeout(timer));
     timers.current = [];
-    const nextStage = Math.min(11, Math.max(...completed, battleStage.id) + 1);
+    const nextStage = Math.min(STORY_STAGE_COUNT, Math.max(...completed, battleStage.id) + 1);
     setSelectedStageId(nextStage);
     setView("map");
     setResult(null);
@@ -476,7 +492,7 @@ export default function Home() {
       setCinematic(null);
       setResult(null);
       setView("map");
-      setSelectedStageId(11);
+      setSelectedStageId(BOSS_STAGE_ID);
     }
   }, [beginBattle, cinematic]);
 
@@ -506,11 +522,11 @@ export default function Home() {
         </button>
         <nav aria-label="게임 모드">
           <button className={view === "map" && !freeBattle ? "active" : ""} onClick={() => { setView("map"); setFreeBattle(false); }}>스토리 작전</button>
-          <button className={freeBattle ? "active" : ""} onClick={() => beginBattle(STORY_STAGES[9], true)}>자유 대전</button>
+          <button className={freeBattle ? "active" : ""} onClick={() => beginBattle(FREE_BATTLE_STAGE, true)}>자유 대전</button>
         </nav>
         <div className="global-progress">
-          <div><span>지구 해방률</span><b>{Math.round((completed.length / 11) * 100)}%</b></div>
-          <i><em style={{ width: `${(completed.length / 11) * 100}%` }} /></i>
+          <div><span>지구 해방률</span><b>{Math.round((completed.length / STORY_STAGE_COUNT) * 100)}%</b></div>
+          <i><em style={{ width: `${(completed.length / STORY_STAGE_COUNT) * 100}%` }} /></i>
         </div>
       </header>}
 
@@ -522,12 +538,12 @@ export default function Home() {
             <p>약수와 배수의 관계를 활용해 치료 세균을 복제하고, 대륙마다 퍼진 질병 세균을 모두 역감염시키세요.</p>
             <div className="brief-stats">
               <div><b>{completed.length}</b><span>해방 지역</span></div>
-              <div><b>{11 - completed.length}</b><span>남은 작전</span></div>
-              <div><b>{completed.includes(11) ? "안정" : "위험"}</b><span>지구 상태</span></div>
+              <div><b>{STORY_STAGE_COUNT - completed.length}</b><span>남은 작전</span></div>
+              <div><b>{completed.includes(BOSS_STAGE_ID) ? "안정" : "위험"}</b><span>지구 상태</span></div>
             </div>
             <div className="transmission-log">
               <span className="pulse-dot" />
-              <div><small>연구소 통신</small><p>{completed.length === 0 ? "서울 연구소에서 치료 세균 배양 완료. 첫 작전을 승인합니다." : completed.includes(11) ? "전 세계 감염 신호 소멸. 지구 생태계가 정상화되었습니다." : `${unlocked}번 감염 지역의 구조 요청을 수신했습니다.`}</p></div>
+              <div><small>연구소 통신</small><p>{completed.length === 0 ? "치료 세균 배양 완료. 마닐라의 첫 작전을 승인합니다." : completed.includes(BOSS_STAGE_ID) ? "전 세계 감염 신호 소멸. 지구 생태계가 정상화되었습니다." : `${unlocked}번 감염 지역의 구조 요청을 수신했습니다.`}</p></div>
             </div>
           </section>
 
@@ -638,7 +654,7 @@ export default function Home() {
             <p>{result === "clear" ? `${battleStage.lesson}의 핵심 개념으로 질병 세균을 모두 제거했습니다.` : "숫자 관계와 모드를 다시 확인하고 재도전하세요."}</p>
             <div>
               <button onClick={() => beginBattle(battleStage, freeBattle)}>다시 하기</button>
-              <button className="primary" onClick={returnToMap}>{freeBattle ? "스토리 지도로" : battleStage.id < 11 ? "다음 작전 확인" : "세계 지도"} →</button>
+              <button className="primary" onClick={returnToMap}>{freeBattle ? "스토리 지도로" : battleStage.id < BOSS_STAGE_ID ? "다음 작전 확인" : "세계 지도"} →</button>
             </div>
           </section>
         </div>

@@ -55,23 +55,6 @@ export const MODE_COPY: Record<StoryMode, { label: string; short: string; explan
 export const STORY_STAGES: StoryStage[] = [
   {
     id: 1,
-    lesson: "1차시 · 단원 도입",
-    title: "감염 경보: 서울",
-    place: "대한민국 · 서울",
-    continent: "아시아",
-    x: 78,
-    y: 37,
-    story: "세계 감염망의 첫 신호가 서울에서 포착됐다. 치료 세균의 두 기본 반응을 시험해 연구소를 지켜 내자.",
-    mission: "약수와 배수 관계를 이용해 질병 세균을 모두 치료하세요.",
-    learning: "생활 속에서 약수와 배수가 필요한 까닭을 알아봅니다.",
-    example: "6은 2와 3으로 나누어떨어지고, 2의 3배이기도 해요.",
-    modes: ["divisor", "multiple"],
-    playerNumbers: [6, 4, 3],
-    enemyNumbers: [1, 2, 3, 6, 8, 9],
-    difficulty: 1,
-  },
-  {
-    id: 2,
     lesson: "2차시 · 약수 이해하기",
     title: "사탕 창고 구조",
     place: "필리핀 · 마닐라",
@@ -88,7 +71,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 1,
   },
   {
-    id: 3,
+    id: 2,
     lesson: "3차시 · 배수 이해하기",
     title: "오세아니아 방벽",
     place: "호주 · 시드니",
@@ -105,7 +88,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 1,
   },
   {
-    id: 4,
+    id: 3,
     lesson: "4차시 · 공약수와 최대공약수",
     title: "나이로비 보급 분배",
     place: "케냐 · 나이로비",
@@ -122,7 +105,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 2,
   },
   {
-    id: 5,
+    id: 4,
     lesson: "5차시 · 최대공약수 구하기",
     title: "카이로 치료 화단",
     place: "이집트 · 카이로",
@@ -139,7 +122,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 2,
   },
   {
-    id: 6,
+    id: 5,
     lesson: "6차시 · 공배수와 최소공배수",
     title: "로마 생태 동기화",
     place: "이탈리아 · 로마",
@@ -156,7 +139,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 2,
   },
   {
-    id: 7,
+    id: 6,
     lesson: "7차시 · 최소공배수 구하기",
     title: "등대 동시 점등",
     place: "영국 · 런던",
@@ -173,7 +156,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 2,
   },
   {
-    id: 8,
+    id: 7,
     lesson: "8차시 · 약수와 배수 이어달리기",
     title: "아마존 릴레이",
     place: "브라질 · 리우",
@@ -190,7 +173,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 3,
   },
   {
-    id: 9,
+    id: 8,
     lesson: "9차시 · 생활 속 최소공배수",
     title: "대륙 횡단 열차",
     place: "미국 · 뉴욕",
@@ -207,7 +190,7 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 3,
   },
   {
-    id: 10,
+    id: 9,
     lesson: "10차시 · 배운 내용 확인",
     title: "북극권 최종 방어선",
     place: "캐나다 · 북극권",
@@ -224,8 +207,8 @@ export const STORY_STAGES: StoryStage[] = [
     difficulty: 3,
   },
   {
-    id: 11,
-    lesson: "보스 스테이지 · 전 차시 복습",
+    id: 10,
+    lesson: "보스 스테이지 · 2~10차시 복습",
     title: "원천균: 제로 프라임",
     place: "태평양 · 무인도",
     continent: "태평양",
@@ -233,7 +216,7 @@ export const STORY_STAGES: StoryStage[] = [
     y: 58,
     story: "모든 감염의 원천이 태평양 무인도에서 모습을 드러냈다. 수를 바꾸며 주변 세균을 되살리는 보스에게 연속 치료를 성공시켜라.",
     mission: "모든 모드로 보스를 5회 감염시키고 남은 질병 세균까지 제거하세요.",
-    learning: "전 차시의 약수와 배수 개념을 종합적으로 복습합니다.",
+    learning: "2~10차시의 약수와 배수 개념을 종합적으로 복습합니다.",
     example: "보스가 12 → 18 → 24 → 30 → 36으로 변이하므로 매번 관계를 다시 확인",
     modes: ["divisor", "multiple", "split"],
     playerNumbers: [6, 8, 12, 18],

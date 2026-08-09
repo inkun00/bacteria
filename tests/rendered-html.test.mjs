@@ -24,7 +24,7 @@ test("server-renders the Korean Factor Force shell", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton|codex-preview/i);
 });
 
-test("ships the 11-stage story campaign, boss mechanics, and cinematic assets", async () => {
+test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic assets", async () => {
   const [layout, page, story, styles, opening, ending, worldMap, idleGerm, infectionGerm] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -42,9 +42,17 @@ test("ships the 11-stage story campaign, boss mechanics, and cinematic assets", 
   assert.match(page, /ENDING_CAPTIONS/);
   assert.match(styles, /WORLD INFECTION MAP/);
   assert.match(page, /남은 질병 세균/);
-  assert.match(page, /factor-force-story-progress-v1/);
+  assert.match(page, /factor-force-story-progress-v2/);
+  assert.match(page, /LEGACY_STORY_SAVE_KEY/);
   assert.match(page, /applyBossPulse/);
-  assert.match(story, /id: 11/);
+  const stageIds = [...story.matchAll(/^\s{4}id: (\d+),$/gm)].map((match) => Number(match[1]));
+  assert.deepEqual(stageIds, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  for (let lesson = 2; lesson <= 10; lesson += 1) {
+    assert.match(story, new RegExp(`id: ${lesson - 1},\\n    lesson: "${lesson}차시`));
+  }
+  assert.match(story, /id: 10/);
+  assert.doesNotMatch(story, /1차시 · 단원 도입/);
+  assert.doesNotMatch(story, /감염 경보: 서울/);
   assert.match(story, /원천균: 제로 프라임/);
   assert.match(story, /hp: 5/);
   assert.match(story, /sequence: \[12, 18, 24, 30, 36\]/);
