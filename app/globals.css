@@ -764,3 +764,59 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+/* Game title and mode selection */
+.title-screen {
+  --title-cyan: #35ead3;
+  --title-coral: #ff6d68;
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: #edfff9;
+  background: #020b0a;
+  isolation: isolate;
+}
+.title-hero-image { position: absolute; inset: 0; z-index: -4; width: 100%; height: 100%; object-fit: cover; object-position: 50% 48%; filter: saturate(.9) contrast(1.05) brightness(.62); transform: scale(1.02); }
+.title-vignette { position: absolute; inset: 0; z-index: -3; background: linear-gradient(90deg, rgba(1,10,9,.9), rgba(2,13,11,.48) 48%, rgba(2,9,8,.83)), linear-gradient(0deg, #020a09 0, transparent 35%, rgba(2,9,8,.55) 100%); }
+.title-grid { position: absolute; inset: 0; z-index: -2; opacity: .22; background-image: linear-gradient(rgba(84,211,185,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(84,211,185,.12) 1px, transparent 1px); background-size: 52px 52px; mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent); }
+.title-content { width: min(960px, calc(100% - 36px)); min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 42px 0 26px; text-align: center; animation: titleReveal .8s ease-out both; }
+.title-kicker { display: flex; align-items: center; gap: 9px; margin-bottom: 18px; color: #8db8ad; font: 700 9px "IBM Plex Mono", monospace; letter-spacing: .24em; }
+.title-kicker i { width: 7px; height: 7px; border-radius: 50%; background: #b8ed75; box-shadow: 0 0 16px #b8ed75; animation: pulse 1.7s infinite; }
+.title-logo-lockup { display: grid; grid-template-columns: 120px auto 120px; align-items: center; gap: clamp(14px, 3vw, 38px); }
+.title-logo-lockup > .germ-sprite { width: clamp(82px, 9vw, 120px); filter: drop-shadow(0 18px 28px rgba(0,0,0,.65)); }
+.title-logo-lockup > .germ-sprite:first-child { transform: rotate(-8deg); }
+.title-logo-lockup > .germ-sprite:last-child { transform: rotate(8deg); }
+.title-logo-lockup small { display: block; color: #a7d6c9; font: 800 clamp(9px, 1vw, 12px) "IBM Plex Mono", monospace; letter-spacing: .34em; }
+.title-logo-lockup h1 { margin: 8px 0 0; color: white; font: 900 clamp(58px, 9vw, 112px)/.73 Arial, Helvetica, sans-serif; letter-spacing: -.065em; text-shadow: 0 12px 38px rgba(0,0,0,.72); }
+.title-logo-lockup h1 em { color: transparent; font-style: normal; -webkit-text-stroke: 1.5px var(--title-cyan); text-shadow: 0 0 28px rgba(53,234,211,.28); }
+.title-logo-lockup p { width: max-content; margin: 14px auto 0; padding: 6px 14px; border: 1px solid rgba(53,234,211,.38); color: var(--title-cyan); background: rgba(3,24,20,.72); font: 800 12px "IBM Plex Mono", monospace; letter-spacing: .38em; }
+.title-tagline { margin: 24px 0 26px; color: #d8e9e4; font-size: clamp(13px, 1.4vw, 17px); letter-spacing: .05em; text-shadow: 0 2px 12px #000; }
+.title-actions { width: min(700px, 100%); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.title-actions button { min-height: 92px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 19px; border: 1px solid; border-radius: 12px; text-align: left; cursor: pointer; backdrop-filter: blur(15px); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.title-actions button:hover { transform: translateY(-4px); }
+.title-actions button span { display: flex; flex-direction: column; gap: 3px; }
+.title-actions button small { font: 700 7px "IBM Plex Mono", monospace; letter-spacing: .2em; }
+.title-actions button b { color: #fff; font-size: 18px; }
+.title-actions button em { color: #9db3ad; font-size: 10px; font-style: normal; }
+.title-actions button > i { flex: 0 0 auto; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-style: normal; }
+.story-launch { color: var(--title-cyan); border-color: rgba(53,234,211,.44); background: linear-gradient(135deg, rgba(16,64,54,.86), rgba(5,25,22,.83)); box-shadow: 0 14px 36px rgba(0,0,0,.34); }
+.story-launch:hover { border-color: var(--title-cyan); box-shadow: 0 14px 38px rgba(53,234,211,.15); }
+.free-launch { color: #ff9b7e; border-color: rgba(255,109,104,.38); background: linear-gradient(135deg, rgba(64,35,28,.84), rgba(24,18,15,.84)); box-shadow: 0 14px 36px rgba(0,0,0,.34); }
+.free-launch:hover { border-color: var(--title-coral); box-shadow: 0 14px 38px rgba(255,109,104,.14); }
+.title-content footer { display: flex; align-items: center; gap: 12px; margin-top: 28px; color: #6e8b83; font: 700 7px "IBM Plex Mono", monospace; letter-spacing: .22em; }
+.title-content footer i { width: 45px; height: 1px; background: rgba(150,205,190,.25); }
+
+@keyframes titleReveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 680px) {
+  .title-content { justify-content: flex-end; padding-bottom: 24px; }
+  .title-logo-lockup { grid-template-columns: 58px auto 58px; gap: 6px; }
+  .title-logo-lockup > .germ-sprite { width: 62px; }
+  .title-logo-lockup h1 { font-size: clamp(52px, 20vw, 78px); }
+  .title-logo-lockup small { letter-spacing: .18em; }
+  .title-actions { grid-template-columns: 1fr; gap: 8px; }
+  .title-actions button { min-height: 76px; }
+  .title-tagline { margin: 18px 0; }
+}

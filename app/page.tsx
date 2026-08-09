@@ -3,6 +3,8 @@
 export const dynamic = "force-static";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import FreeBattle from "./free-battle";
+import "./free-battle.css";
 import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
 import {
   MODE_COPY,
@@ -19,7 +21,6 @@ const STORY_SAVE_KEY = "factor-force-story-progress-v2";
 const LEGACY_STORY_SAVE_KEY = "factor-force-story-progress-v1";
 const STORY_STAGE_COUNT = STORY_STAGES.length;
 const BOSS_STAGE_ID = STORY_STAGES[STORY_STAGE_COUNT - 1].id;
-const FREE_BATTLE_STAGE = STORY_STAGES[STORY_STAGE_COUNT - 2];
 
 const OPENING_CAPTIONS = [
   "서기 2042년, 숫자를 바꾸며 증식하는 질병 세균이 지구 전역에 나타났다.",
@@ -35,7 +36,7 @@ const ENDING_CAPTIONS = [
   "임무 완료. 약수와 배수로 지켜 낸 우리의 행성에 평화가 찾아왔다.",
 ];
 
-type View = "map" | "battle";
+type View = "title" | "map" | "battle" | "free";
 type BattleResult = "clear" | "failed" | null;
 type CinematicKind = "opening" | "ending";
 
@@ -95,6 +96,39 @@ function Germ({
       {number !== undefined && <b className="germ-number">{number}</b>}
       {mode && <em className={`germ-mode ${mode}`}>{MODE_COPY[mode].short}</em>}
     </span>
+  );
+}
+
+function TitleScreen({ onStory, onFree }: { onStory: () => void; onFree: () => void }) {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  return (
+    <main className="title-screen">
+      <img className="title-hero-image" src={`${basePath}/assets/story/opening.png`} alt="숫자 질병 세균의 확산에 맞서는 치료 세균 지구 방어대" />
+      <div className="title-vignette" />
+      <div className="title-grid" aria-hidden="true" />
+      <section className="title-content">
+        <div className="title-kicker"><i /> PETRI MATH LAB // GLOBAL RESPONSE</div>
+        <div className="title-logo-lockup">
+          <Germ player={1} />
+          <div>
+            <small>약수와 배수 지구 방어대</small>
+            <h1>FACTOR<br /><em>FORCE</em></h1>
+            <p>수학 세균전</p>
+          </div>
+          <Germ player={2} />
+        </div>
+        <p className="title-tagline">숫자의 관계를 찾아 감염을 뒤집고 지구를 구하라.</p>
+        <div className="title-actions">
+          <button className="story-launch" onClick={onStory}>
+            <span><small>CAMPAIGN</small><b>스토리 모드</b><em>세계 감염 지역을 차례로 해방하세요</em></span><i>→</i>
+          </button>
+          <button className="free-launch" onClick={onFree}>
+            <span><small>CLASSIC BATTLE</small><b>자유 대전</b><em>원본 수학 세균전 규칙으로 대전하세요</em></span><i>→</i>
+          </button>
+        </div>
+        <footer><span>FACTOR FORCE</span><i /> <span>VERSION 07.26</span></footer>
+      </section>
+    </main>
   );
 }
 
@@ -300,7 +334,7 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [completed, setCompleted] = useState<number[]>([]);
   const [selectedStageId, setSelectedStageId] = useState(1);
-  const [view, setView] = useState<View>("map");
+  const [view, setView] = useState<View>("title");
   const [battleStageId, setBattleStageId] = useState(1);
   const [battle, setBattle] = useState<StoryBattle>(() => createStoryBattle(STORY_STAGES[0]));
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
@@ -513,16 +547,24 @@ export default function Home() {
 
   if (!hydrated) return <main className="story-app loading-screen"><div className="loader-germ">∴</div><p>치료 세균을 배양하는 중...</p></main>;
 
+  if (view === "title") {
+    return <TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} />;
+  }
+
+  if (view === "free") {
+    return <FreeBattle onExit={() => setView("title")} />;
+  }
+
   return (
     <main className="story-app">
       {view === "map" && <header className="command-header">
-        <button className="brand" onClick={() => setView("map")} aria-label="세계 작전 지도로 이동">
+        <button className="brand" onClick={() => setView("title")} aria-label="게임 시작 화면으로 이동">
           <span className="brand-mark">ƒ</span>
           <span><b>FACTOR FORCE</b><small>약수와 배수 지구 방어대</small></span>
         </button>
         <nav aria-label="게임 모드">
           <button className={view === "map" && !freeBattle ? "active" : ""} onClick={() => { setView("map"); setFreeBattle(false); }}>스토리 작전</button>
-          <button className={freeBattle ? "active" : ""} onClick={() => beginBattle(FREE_BATTLE_STAGE, true)}>자유 대전</button>
+          <button onClick={() => setView("free")}>자유 대전</button>
         </nav>
         <div className="global-progress">
           <div><span>지구 해방률</span><b>{Math.round((completed.length / STORY_STAGE_COUNT) * 100)}%</b></div>

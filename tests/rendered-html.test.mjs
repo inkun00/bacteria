@@ -74,3 +74,29 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.equal(idleGerm, undefined);
   assert.equal(infectionGerm, undefined);
 });
+
+test("ships the title mode selector and restored classic free battle", async () => {
+  const [page, freeBattle, freeStyles, game] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/free-battle.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/free-battle.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/game.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /function TitleScreen/);
+  assert.match(page, /FACTOR<br \/><em>FORCE/);
+  assert.match(page, /스토리 모드/);
+  assert.match(page, /자유 대전/);
+  assert.match(page, /assets\/story\/opening\.png/);
+  assert.match(page, /<FreeBattle onExit=/);
+  assert.match(freeBattle, /petri-math-lab-game-v1/);
+  assert.match(freeBattle, /컴퓨터와 하기/);
+  assert.match(freeBattle, /친구와 하기/);
+  assert.match(freeBattle, /BOARD_SIZES\.map/);
+  assert.match(freeBattle, /세균탄/);
+  assert.match(freeBattle, /되돌리기/);
+  assert.match(freeBattle, /chooseAiAction/);
+  assert.match(game, /export function applyMove/);
+  assert.match(freeStyles, /\.free-battle \.setup-modal/);
+  assert.match(freeStyles, /@keyframes infectionShot/);
+});
