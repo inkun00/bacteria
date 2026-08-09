@@ -2,7 +2,7 @@
 
 export const dynamic = "force-static";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
 import {
   MODE_COPY,
@@ -49,22 +49,35 @@ function stageModeLabel(modes: RelationMode[]) {
   return modes.map((mode) => MODE_COPY[mode].label.replace(" 모드", "")).join(" · ");
 }
 
+function formatTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const remainder = (seconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${remainder}`;
+}
+
 function Germ({
-  kind,
+  player,
+  infection = false,
   number,
+  mode,
   boss = false,
-  active = false,
 }: {
-  kind: "therapy" | "disease";
-  number: number;
+  player: 1 | 2;
+  infection?: boolean;
+  number?: number;
+  mode?: RelationMode;
   boss?: boolean;
-  active?: boolean;
 }) {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const sprite = infection ? "bacteria-infection.png" : "bacteria-idle.png";
   return (
-    <span className={`story-germ ${kind} ${boss ? "boss" : ""} ${active ? "active" : ""}`} aria-hidden="true">
-      <i className="germ-eye left" />
-      <i className="germ-eye right" />
-      <b>{number}</b>
+    <span
+      className={`germ-sprite p${player} ${infection ? "infection" : "idle"} ${boss ? "boss" : ""}`}
+      aria-hidden="true"
+      style={{ backgroundImage: `url("${basePath}/assets/${sprite}")` }}
+    >
+      {number !== undefined && <b className="germ-number">{number}</b>}
+      {mode && <em className={`germ-mode ${mode}`}>{MODE_COPY[mode].short}</em>}
     </span>
   );
 }
@@ -181,19 +194,21 @@ function StagePanel({
 
 function BattleBoard({
   battle,
-  stage,
   selected,
   hovered,
   flash,
+  shot,
+  relationMode,
   disabled,
   onCell,
   onHover,
 }: {
   battle: StoryBattle;
-  stage: StoryStage;
   selected: number | null;
   hovered: number | null;
   flash: { infected: number[]; resisted: number[] };
+  shot: { from: number; targets: number[]; player: 1 | 2 } | null;
+  relationMode: RelationMode;
   disabled: boolean;
   onCell: (index: number) => void;
   onHover: (index: number | null) => void;
@@ -203,27 +218,64 @@ function BattleBoard({
   ), [battle.board, selected]);
 
   return (
-    <div className="battle-board" role="grid" aria-label="감염 치료 전장">
+    <div className="petri-board-grid" role="grid" aria-label="7 × 7 세균전 게임판">
       {battle.board.map((cell, index) => {
         const number = battle.numbers[index];
         const isBoss = battle.bossIndex === index && battle.bossHp > 0;
+        const isInfected = flash.infected.includes(index);
+        const isResisted = flash.resisted.includes(index);
+        const target = targets.has(index);
         return (
           <button
             key={index}
             role="gridcell"
-            className={`battle-cell ${cell === 0 ? "empty" : cell === 1 ? "therapy-cell" : "disease-cell"} ${selected === index ? "selected" : ""} ${targets.has(index) ? "target" : ""} ${flash.infected.includes(index) ? "infected" : ""} ${flash.resisted.includes(index) ? "resisted" : ""} ${isBoss ? "boss-cell" : ""}`}
+            className={`petri-cell ${cell ? `occupied p${cell}` : "empty"} ${selected === index ? "selected" : ""} ${target ? `legal ${getDistance(selected ?? index, index, 7) === 1 ? "clone" : "jump"}` : ""} ${isInfected ? "hit" : ""} ${isResisted ? "resisted" : ""} ${isBoss ? "boss-cell" : ""}`}
             onClick={() => onCell(index)}
             onMouseEnter={() => onHover(index)}
             onMouseLeave={() => onHover(null)}
             disabled={disabled}
             aria-label={cell === 0 ? `빈 칸 ${index + 1}` : `${cell === 1 ? "치료" : "질병"} 세균 ${number}${isBoss ? `, 보스 내성 ${battle.bossHp}` : ""}`}
           >
-            {cell !== 0 && number !== null && <Germ kind={cell === 1 ? "therapy" : "disease"} number={number} boss={isBoss} active={hovered === index || selected === index} />}
-            {targets.has(index) && <span className="target-mark">+</span>}
+            <span className="cell-gridmark" />
+            {cell !== 0 && number !== null && (
+              <Germ
+                player={cell}
+                infection={isInfected}
+                number={number}
+                mode={selected === index ? relationMode : undefined}
+                boss={isBoss}
+              />
+            )}
+            {target && <span className="move-hint"><i />{getDistance(selected ?? index, index, 7) === 1 ? "+" : "↗"}</span>}
+            {hovered === index && cell === 2 && <span className="preview-ring" />}
+            {isResisted && <span className="resist-mark">관계 없음</span>}
             {isBoss && <span className="boss-hp-mini">{battle.bossHp}</span>}
           </button>
         );
       })}
+      {shot && shot.targets.length > 0 && (
+        <div className="infection-projectile-layer" aria-hidden="true">
+          {shot.targets.map((target, id) => {
+            const fromRow = Math.floor(shot.from / 7);
+            const fromCol = shot.from % 7;
+            const toRow = Math.floor(target / 7);
+            const toCol = target % 7;
+            return (
+              <span
+                key={`${shot.from}-${target}-${id}`}
+                className={`infection-projectile p${shot.player}`}
+                style={{
+                  "--sx": `${((fromCol + .5) / 7) * 100}%`,
+                  "--sy": `${((fromRow + .5) / 7) * 100}%`,
+                  "--ex": `${((toCol + .5) / 7) * 100}%`,
+                  "--ey": `${((toRow + .5) / 7) * 100}%`,
+                  "--delay": `${id * 45}ms`,
+                } as CSSProperties}
+              ><i /></span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -242,7 +294,9 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("치료 세균을 선택한 뒤 빛나는 칸으로 이동하세요.");
   const [flash, setFlash] = useState<{ infected: number[]; resisted: number[] }>({ infected: [], resisted: [] });
+  const [infectionShot, setInfectionShot] = useState<{ from: number; targets: number[]; player: 1 | 2 } | null>(null);
   const [moveCount, setMoveCount] = useState(0);
+  const [battleElapsed, setBattleElapsed] = useState(0);
   const [result, setResult] = useState<BattleResult>(null);
   const [cinematic, setCinematic] = useState<CinematicKind | null>(null);
   const [freeBattle, setFreeBattle] = useState(false);
@@ -259,6 +313,12 @@ export default function Home() {
     setHydrated(true);
     return () => timers.current.forEach((timer) => window.clearTimeout(timer));
   }, []);
+
+  useEffect(() => {
+    if (view !== "battle" || result) return;
+    const timer = window.setInterval(() => setBattleElapsed((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [result, view]);
 
   const schedule = useCallback((callback: () => void, delay: number) => {
     const timer = window.setTimeout(callback, delay);
@@ -286,8 +346,10 @@ export default function Home() {
     setTurn(1);
     setBusy(false);
     setMoveCount(0);
+    setBattleElapsed(0);
     setResult(null);
     setFlash({ infected: [], resisted: [] });
+    setInfectionShot(null);
     setFeedback(`${MODE_COPY[stage.modes[0]].label} 준비 완료. ${stage.mission}`);
     setView("battle");
   }, []);
@@ -319,18 +381,21 @@ export default function Home() {
       setBattle(working);
       if (pulse.relationText) setFeedback(pulse.relationText);
       setFlash({ infected: pulse.infected, resisted: [] });
+      setInfectionShot(pulse.infected.length ? { from: working.bossIndex ?? 24, targets: pulse.infected, player: 2 } : null);
     }
 
     const action = chooseStoryAiMove(working, battleStage);
     if (!action) {
       setTurn(1);
       setBusy(false);
+      setInfectionShot(null);
       setFeedback("질병 세균이 이동할 수 없어요. 치료 작전을 계속하세요.");
       return;
     }
     const enemyResult = applyStoryMove(working, battleStage, 2, action.move, action.mode);
     setBattle(enemyResult);
     setFlash({ infected: enemyResult.infected, resisted: enemyResult.resisted });
+    setInfectionShot(enemyResult.infected.length ? { from: action.move.to, targets: enemyResult.infected, player: 2 } : null);
     setFeedback(enemyResult.infected.length
       ? `역감염 발생! ${enemyResult.relationText}`
       : `질병 세균의 공격을 막았어요. ${enemyResult.relationText}`);
@@ -342,6 +407,7 @@ export default function Home() {
     }
     schedule(() => {
       setFlash({ infected: [], resisted: [] });
+      setInfectionShot(null);
       setTurn(1);
       setBusy(false);
     }, 650);
@@ -353,10 +419,14 @@ export default function Home() {
     const next = applyStoryMove(battle, battleStage, 1, move, relationMode);
     setBattle(next);
     setFlash({ infected: next.infected, resisted: next.resisted });
+    const playerTargets = next.bossHit && next.bossIndex !== null && !next.infected.includes(next.bossIndex)
+      ? [...next.infected, next.bossIndex]
+      : next.infected;
+    setInfectionShot(playerTargets.length ? { from: move.to, targets: playerTargets, player: 1 } : null);
     setFeedback(next.infected.length || next.bossHit ? next.relationText : `감염 조건 불일치. ${next.relationText}`);
     setMoveCount((value) => value + 1);
     if (!next.board.includes(2)) {
-      finishBattle(battleStage);
+      schedule(() => finishBattle(battleStage), 780);
       return;
     }
     setTurn(2);
@@ -412,6 +482,9 @@ export default function Home() {
 
   const remainingDisease = battle.board.filter((cell) => cell === 2).length;
   const therapyCount = battle.board.filter((cell) => cell === 1).length;
+  const occupiedPercent = Math.round(((remainingDisease + therapyCount) / battle.board.length) * 100);
+  const therapyCaptures = Math.max(0, battleStage.enemyNumbers.length - remainingDisease);
+  const diseaseCaptures = Math.max(0, battleStage.playerNumbers.length - therapyCount);
   const selectedNumber = selectedCell === null ? null : battle.numbers[selectedCell];
   const hoverNumber = hoveredCell === null ? null : battle.numbers[hoveredCell];
   const liveComparison = selectedNumber && hoverNumber && battle.board[hoveredCell ?? 0] === 2
@@ -426,7 +499,7 @@ export default function Home() {
 
   return (
     <main className="story-app">
-      <header className="command-header">
+      {view === "map" && <header className="command-header">
         <button className="brand" onClick={() => setView("map")} aria-label="세계 작전 지도로 이동">
           <span className="brand-mark">ƒ</span>
           <span><b>FACTOR FORCE</b><small>약수와 배수 지구 방어대</small></span>
@@ -439,7 +512,7 @@ export default function Home() {
           <div><span>지구 해방률</span><b>{Math.round((completed.length / 11) * 100)}%</b></div>
           <i><em style={{ width: `${(completed.length / 11) * 100}%` }} /></i>
         </div>
-      </header>
+      </header>}
 
       {view === "map" ? (
         <div className="map-layout">
@@ -462,65 +535,97 @@ export default function Home() {
           <StagePanel stage={selectedStage} complete={completed.includes(selectedStage.id)} locked={selectedStage.id > unlocked && !completed.includes(selectedStage.id)} onStart={startSelectedStage} />
         </div>
       ) : (
-        <div className="battle-layout">
-          <aside className="battle-brief">
-            <button className="back-map" onClick={() => setView("map")}>← 세계 지도</button>
-            <span className="battle-stage-number">{freeBattle ? "FREE" : battleStage.id === 11 ? "BOSS" : `STAGE ${String(battleStage.id).padStart(2, "0")}`}</span>
-            <h1>{freeBattle ? "종합 모의 전투" : battleStage.title}</h1>
-            <p>{battleStage.mission}</p>
-            <div className="objective-card">
-              <small>작전 목표</small>
-              <strong>질병 세균 전멸</strong>
-              <div><span>남은 질병</span><b>{remainingDisease}</b></div>
-              {battleStage.boss && <div><span>보스 내성</span><b>{battle.bossHp} / {battle.bossMaxHp}</b></div>}
-            </div>
-            <div className="lesson-card">
-              <small>{battleStage.lesson}</small>
-              <strong>{battleStage.learning}</strong>
-              <p>{battleStage.example}</p>
-            </div>
-          </aside>
+        <div className="petri-battle-screen">
+          <header className="petri-topbar">
+            <button className="petri-brand" onClick={returnToMap} aria-label="세계 작전 지도로 돌아가기">
+              <span className="petri-brand-mark"><i /><i /><i /></span>
+              <span><strong>페트리</strong><small>// 07</small></span>
+            </button>
+            <div className="petri-topbar-center"><span className="petri-live-dot" /><span>게임 시간</span><b>{formatTime(battleElapsed)}</b></div>
+            <nav className="petri-top-actions" aria-label="전투 메뉴">
+              <button aria-label="소리">◖))</button>
+              <button aria-label="학습 목표" title={battleStage.learning}>?</button>
+              <button className="petri-stage-button" onClick={returnToMap}><span>{freeBattle ? "자유 대전" : `${battleStage.lesson} · 7×7`}</span><b>지도</b></button>
+            </nav>
+          </header>
 
-          <section className="battle-center">
-            <div className="battle-statusbar">
-              <div className="unit-count therapy"><span>치료 세균</span><b>{therapyCount}</b></div>
-              <div className={`turn-indicator ${turn === 2 ? "enemy" : ""}`}><i /> {busy ? (turn === 2 ? "질병 세균 변이 중" : "감염 판정 중") : turn === 1 ? "치료 세균 차례" : "질병 세균 차례"}</div>
-              <div className="unit-count disease"><span>질병 세균</span><b>{remainingDisease}</b></div>
+          <section className="petri-status-rail" aria-live="polite">
+            <div className={`petri-turn-beacon p${turn}`}><span>{busy ? "진행" : turn === 1 ? "청록" : "코랄"}</span></div>
+            <div className="petri-status-copy">
+              <small>턴 {String(moveCount + 1).padStart(2, "0")} · {turn === 1 ? "치료 세균" : "컴퓨터"} · {battleStage.title}</small>
+              <strong>{liveComparison ?? feedback}</strong>
             </div>
-            <BattleBoard battle={battle} stage={battleStage} selected={selectedCell} hovered={hoveredCell} flash={flash} disabled={busy || !!result} onCell={handleCell} onHover={setHoveredCell} />
-            <div className={`feedback-console ${flash.infected.length ? "success" : flash.resisted.length ? "warning" : ""}`}>
-              <span>ƒx</span><p>{liveComparison ?? feedback}</p>
-            </div>
+            <div className="petri-coverage"><span>채운 칸</span><b>{occupiedPercent}%</b><i><em style={{ width: `${occupiedPercent}%` }} /></i></div>
           </section>
 
-          <aside className="control-panel">
-            <small className="eyebrow">TREATMENT CONTROL</small>
-            <h2>치료 방식 선택</h2>
-            <p>이 스테이지의 학습 내용에 맞는 모드만 사용할 수 있습니다.</p>
-            <div className="mode-buttons">
-              {(Object.keys(MODE_COPY) as RelationMode[]).map((mode) => {
-                const allowed = battleStage.modes.includes(mode);
-                return (
-                  <button key={mode} disabled={!allowed || busy} className={`${relationMode === mode ? "active" : ""} ${!allowed ? "locked" : ""}`} onClick={() => chooseMode(mode)}>
-                    <span>{MODE_COPY[mode].short}</span>
-                    <div><b>{MODE_COPY[mode].label}</b><small>{allowed ? MODE_COPY[mode].explanation : "이번 차시에서는 잠겨 있어요."}</small></div>
-                    <i>{allowed ? relationMode === mode ? "ON" : "선택" : "잠김"}</i>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="how-to-move">
-              <small>조작 방법</small>
-              <ol>
-                <li><span>1</span> 파란 치료 세균을 선택</li>
-                <li><span>2</span> 빛나는 빈 칸으로 이동</li>
-                <li><span>3</span> 주변 숫자 관계를 확인</li>
-              </ol>
-              <p><b>1칸</b> 이동하면 복제 · <b>2칸</b> 이동하면 자리 이동</p>
-            </div>
-            <button className="restart-button" onClick={() => beginBattle(battleStage, freeBattle)}>↻ 이 스테이지 다시 시작</button>
-            <div className="move-counter"><span>작전 턴</span><b>{moveCount}</b></div>
-          </aside>
+          <section className="petri-game-layout">
+            <aside className={`petri-player-panel cyan ${turn === 1 && !result ? "active" : ""}`}>
+              <div className="petri-player-topline"><span>청록 팀</span><i>● 준비됨</i></div>
+              <div className="petri-portrait"><Germ player={1} /><span className="petri-scanline" /></div>
+              <div className="petri-identity"><small>내 치료 세균</small><h2>플레이어 1</h2></div>
+              <div className="petri-score-block"><small>세균 수</small><strong>{String(therapyCount).padStart(2, "0")}</strong></div>
+              <div className="petri-player-metrics">
+                <span><small>감염</small><b>+{therapyCaptures}</b></span>
+                <span><small>이동 가능</small><b>{legalMoves(battle.board, 1).length}</b></span>
+                <span><small>사용 모드</small><b>×{battleStage.modes.length}</b></span>
+              </div>
+            </aside>
+
+            <section className="petri-board-stage">
+              <div className="petri-frame">
+                <div className="petri-frame-label"><span>게임판</span><b>07 × 07</b></div>
+                <div className="petri-board-wrap">
+                  <BattleBoard
+                    battle={battle}
+                    selected={selectedCell}
+                    hovered={hoveredCell}
+                    flash={flash}
+                    shot={infectionShot}
+                    relationMode={relationMode}
+                    disabled={busy || !!result}
+                    onCell={handleCell}
+                    onHover={setHoveredCell}
+                  />
+                </div>
+              </div>
+              <div className="petri-board-controls">
+                <button onClick={returnToMap}><span>↶</span> 작전 지도</button>
+                <div className="petri-mode-controls" aria-label="치료 모드">
+                  {(Object.keys(MODE_COPY) as RelationMode[]).map((mode) => {
+                    const allowed = battleStage.modes.includes(mode);
+                    return (
+                      <button
+                        key={mode}
+                        className={`${relationMode === mode ? "active" : ""} ${!allowed ? "locked" : ""}`}
+                        disabled={!allowed || busy}
+                        onClick={() => chooseMode(mode)}
+                        title={allowed ? MODE_COPY[mode].explanation : "이번 차시에서는 사용할 수 없습니다."}
+                      ><i>{MODE_COPY[mode].short}</i><span>{MODE_COPY[mode].label}</span></button>
+                    );
+                  })}
+                </div>
+                <button onClick={() => beginBattle(battleStage, freeBattle)}><span>↻</span> 새 게임</button>
+              </div>
+            </section>
+
+            <aside className={`petri-player-panel coral ${turn === 2 && !result ? "active" : ""}`}>
+              <div className="petri-player-topline"><span>코랄 팀</span><i>● 컴퓨터</i></div>
+              <div className="petri-portrait"><Germ player={2} /><span className="petri-scanline" /></div>
+              <div className="petri-identity"><small>{battleStage.boss ? "원천균 지휘망" : "컴퓨터 세균"}</small><h2>{battleStage.boss ? "보스 세균" : "컴퓨터"}</h2></div>
+              <div className="petri-score-block"><small>세균 수</small><strong>{String(remainingDisease).padStart(2, "0")}</strong></div>
+              <div className="petri-player-metrics">
+                <span><small>역감염</small><b>+{diseaseCaptures}</b></span>
+                <span><small>난이도</small><b>{battleStage.difficulty === 1 ? "쉬움" : battleStage.difficulty === 2 ? "보통" : "어려움"}</b></span>
+                <span><small>{battleStage.boss ? "내성" : "모드"}</small><b>{battleStage.boss ? `×${battle.bossHp}` : `×${battleStage.modes.length}`}</b></span>
+              </div>
+            </aside>
+          </section>
+
+          <section className="petri-learning-dock">
+            <div><span><i /> {battleStage.lesson}</span><b>{MODE_COPY[relationMode].label}</b></div>
+            <p>{battleStage.example}</p>
+            <div className="petri-mission-progress"><span>남은 질병 세균</span><i><em style={{ width: `${Math.max(0, Math.min(100, (therapyCaptures / Math.max(1, battleStage.enemyNumbers.length)) * 100))}%` }} /></i><b>{remainingDisease}</b></div>
+          </section>
         </div>
       )}
 

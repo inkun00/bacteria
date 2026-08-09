@@ -25,7 +25,7 @@ test("server-renders the Korean Factor Force shell", async () => {
 });
 
 test("ships the 11-stage story campaign, boss mechanics, and cinematic assets", async () => {
-  const [layout, page, story, styles, opening, ending, worldMap] = await Promise.all([
+  const [layout, page, story, styles, opening, ending, worldMap, idleGerm, infectionGerm] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/story.ts", import.meta.url), "utf8"),
@@ -33,13 +33,15 @@ test("ships the 11-stage story campaign, boss mechanics, and cinematic assets", 
     access(new URL("../public/assets/story/opening.png", import.meta.url)),
     access(new URL("../public/assets/story/ending.png", import.meta.url)),
     access(new URL("../public/assets/story/world-operation-map.png", import.meta.url)),
+    access(new URL("../public/assets/bacteria-idle.png", import.meta.url)),
+    access(new URL("../public/assets/bacteria-infection.png", import.meta.url)),
   ]);
 
   assert.match(layout, /Factor Force \| 약수와 배수 지구 방어대/);
   assert.match(page, /OPENING_CAPTIONS/);
   assert.match(page, /ENDING_CAPTIONS/);
   assert.match(styles, /WORLD INFECTION MAP/);
-  assert.match(page, /질병 세균 전멸/);
+  assert.match(page, /남은 질병 세균/);
   assert.match(page, /factor-force-story-progress-v1/);
   assert.match(page, /applyBossPulse/);
   assert.match(story, /id: 11/);
@@ -52,7 +54,15 @@ test("ships the 11-stage story campaign, boss mechanics, and cinematic assets", 
   assert.match(styles, /\.world-map/);
   assert.match(styles, /world-operation-map\.png/);
   assert.match(styles, /\.cinematic/);
+  assert.match(page, /petri-battle-screen/);
+  assert.match(page, /infection-projectile-layer/);
+  assert.match(page, /bacteria-idle\.png/);
+  assert.match(page, /bacteria-infection\.png/);
+  assert.match(styles, /@keyframes spriteIdle/);
+  assert.match(styles, /@keyframes infectionShot/);
   assert.equal(opening, undefined);
   assert.equal(ending, undefined);
   assert.equal(worldMap, undefined);
+  assert.equal(idleGerm, undefined);
+  assert.equal(infectionGerm, undefined);
 });
