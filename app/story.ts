@@ -15,6 +15,16 @@ import {
 
 export type StoryMode = RelationMode;
 
+export type LearningTask = {
+  id: string;
+  prompt: string;
+  context: string;
+  options: string[];
+  answers: string[];
+  multiple?: boolean;
+  explanation: string;
+};
+
 export type StoryStage = {
   id: number;
   lesson: string;
@@ -225,6 +235,242 @@ export const STORY_STAGES: StoryStage[] = [
     boss: { hp: 5, sequence: [12, 18, 24, 30, 36] },
   },
 ];
+
+export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
+  1: [
+    {
+      id: "divisors-of-12",
+      prompt: "12의 약수를 모두 선택하세요.",
+      context: "12를 나누었을 때 나머지가 0인 수를 모두 찾아 치료 코어를 해제하세요.",
+      options: ["1", "2", "3", "4", "5", "6", "8", "12"],
+      answers: ["1", "2", "3", "4", "6", "12"],
+      multiple: true,
+      explanation: "12는 1, 2, 3, 4, 6, 12로 나누어떨어집니다. 따라서 이 수들이 12의 약수입니다.",
+    },
+    {
+      id: "divisor-remainder",
+      prompt: "5가 12의 약수가 아닌 까닭은 무엇일까요?",
+      context: "약수인지 판단할 때 확인해야 하는 조건을 고르세요.",
+      options: ["12 ÷ 5의 나머지가 0이 아니기 때문", "5가 12보다 작기 때문", "5가 홀수이기 때문"],
+      answers: ["12 ÷ 5의 나머지가 0이 아니기 때문"],
+      explanation: "어떤 수로 나누었을 때 나머지가 0이어야 그 수의 약수입니다.",
+    },
+  ],
+  2: [
+    {
+      id: "multiples-of-4",
+      prompt: "4의 배수를 작은 수부터 6개 나열한 신호는?",
+      context: "4에 1, 2, 3, …을 차례로 곱해 확인하세요.",
+      options: ["4, 8, 12, 16, 20, 24", "1, 2, 4, 8, 12, 16", "4, 6, 8, 10, 12, 14"],
+      answers: ["4, 8, 12, 16, 20, 24"],
+      explanation: "4×1부터 4×6까지 계산하면 4, 8, 12, 16, 20, 24가 됩니다.",
+    },
+    {
+      id: "factor-multiple-link",
+      prompt: "4 × 6 = 24에서 옳은 관계를 고르세요.",
+      context: "곱셈식은 약수와 배수의 관계를 함께 보여 줍니다.",
+      options: ["4와 6은 24의 약수이고, 24는 4와 6의 배수", "24는 4의 약수", "6은 24의 배수"],
+      answers: ["4와 6은 24의 약수이고, 24는 4와 6의 배수"],
+      explanation: "곱해서 24를 만드는 4와 6은 24의 약수이고, 24는 두 수의 배수입니다.",
+    },
+  ],
+  3: [
+    {
+      id: "common-divisors",
+      prompt: "12와 18의 공약수를 모두 선택하세요.",
+      context: "두 수를 모두 나누어떨어지게 하는 수만 선택해야 합니다.",
+      options: ["1", "2", "3", "4", "6", "9", "12"],
+      answers: ["1", "2", "3", "6"],
+      multiple: true,
+      explanation: "1, 2, 3, 6은 12와 18을 모두 나누어떨어지게 하므로 공약수입니다.",
+    },
+    {
+      id: "greatest-common-divisor",
+      prompt: "12와 18의 최대공약수는?",
+      context: "앞에서 찾은 공약수 중 가장 큰 수를 선택하세요.",
+      options: ["3", "6", "12", "18"],
+      answers: ["6"],
+      explanation: "공약수 1, 2, 3, 6 중 가장 큰 수는 6입니다.",
+    },
+  ],
+  4: [
+    {
+      id: "gcd-division-path",
+      prompt: "18과 24를 공약수로 계속 나눈 올바른 경로는?",
+      context: "두 수를 같은 공약수로 나누는 과정을 추적하세요.",
+      options: ["18, 24 ÷ 2 → 9, 12 ÷ 3 → 3, 4", "18, 24 ÷ 3 → 6, 7", "18, 24 ÷ 4 → 4, 6"],
+      answers: ["18, 24 ÷ 2 → 9, 12 ÷ 3 → 3, 4"],
+      explanation: "먼저 2로, 이어서 3으로 두 수를 함께 나눌 수 있습니다.",
+    },
+    {
+      id: "gcd-product",
+      prompt: "공통으로 나눈 2와 3을 이용한 최대공약수는?",
+      context: "공통으로 나눈 수를 곱해 최대공약수를 완성하세요.",
+      options: ["2", "3", "5", "6"],
+      answers: ["6"],
+      explanation: "공통으로 나눈 수 2와 3을 곱한 6이 18과 24의 최대공약수입니다.",
+    },
+  ],
+  5: [
+    {
+      id: "common-multiples",
+      prompt: "50보다 작은 3과 5의 공배수를 모두 선택하세요.",
+      context: "3의 배수이면서 동시에 5의 배수인 수를 찾으세요.",
+      options: ["10", "15", "20", "30", "35", "45"],
+      answers: ["15", "30", "45"],
+      multiple: true,
+      explanation: "15, 30, 45는 모두 3과 5로 나누어떨어지는 공배수입니다.",
+    },
+    {
+      id: "least-common-multiple",
+      prompt: "3과 5의 최소공배수는?",
+      context: "공배수 중 가장 작은 수가 최소공배수입니다.",
+      options: ["5", "10", "15", "30"],
+      answers: ["15"],
+      explanation: "공배수 15, 30, 45, … 중 가장 작은 수는 15입니다.",
+    },
+  ],
+  6: [
+    {
+      id: "lcm-division-path",
+      prompt: "12와 20의 최소공배수 계산식으로 알맞은 것은?",
+      context: "공통 인수와 마지막에 남은 몫을 모두 한 번씩 곱하세요.",
+      options: ["2 × 2 × 3 × 5 = 60", "2 × 2 = 4", "12 × 20 = 240"],
+      answers: ["2 × 2 × 3 × 5 = 60"],
+      explanation: "12와 20을 2, 2로 함께 나누고 남은 3과 5까지 곱하면 60입니다.",
+    },
+    {
+      id: "lcm-check",
+      prompt: "12와 20이 처음으로 다시 만나는 배수는?",
+      context: "두 수의 최소공배수를 선택하세요.",
+      options: ["40", "60", "80", "120"],
+      answers: ["60"],
+      explanation: "60은 12×5이면서 20×3이고, 가장 작은 공배수입니다.",
+    },
+  ],
+  7: [
+    {
+      id: "relay-options",
+      prompt: "12 다음에 이어 쓸 수 있는 수를 모두 선택하세요.",
+      context: "다음 수는 12의 약수이거나 12의 배수여야 합니다.",
+      options: ["4", "5", "18", "24"],
+      answers: ["4", "24"],
+      multiple: true,
+      explanation: "4는 12의 약수이고 24는 12의 배수이므로 둘 다 이어 쓸 수 있습니다.",
+    },
+    {
+      id: "relay-chain",
+      prompt: "중복 없이 완성된 이어달리기 경로는?",
+      context: "앞 수와 다음 수가 매번 약수 또는 배수 관계인지 확인하세요.",
+      options: ["3 → 12 → 4 → 20", "3 → 12 → 5 → 20", "3 → 12 → 3 → 9"],
+      answers: ["3 → 12 → 4 → 20"],
+      explanation: "3→12는 배수, 12→4는 약수, 4→20은 배수 관계이고 같은 수를 반복하지 않았습니다.",
+    },
+  ],
+  8: [
+    {
+      id: "train-information",
+      prompt: "두 열차의 동시 도착 시간을 구할 때 꼭 필요한 정보는?",
+      context: "문제를 풀기 위해 필요한 조건을 판단하세요.",
+      options: ["각 열차의 운행 간격과 처음 함께 출발한 시간", "열차의 색과 좌석 수", "역 사이의 거리만"],
+      answers: ["각 열차의 운행 간격과 처음 함께 출발한 시간"],
+      explanation: "두 운행 간격의 최소공배수와 기준이 되는 출발 시간이 필요합니다.",
+    },
+    {
+      id: "train-lcm",
+      prompt: "12분과 18분 간격 열차가 7시에 함께 출발했습니다. 다시 만나는 때는?",
+      context: "12와 18의 최소공배수를 시간표에 적용하세요.",
+      options: ["7시 24분", "7시 30분", "7시 36분", "7시 48분"],
+      answers: ["7시 36분"],
+      explanation: "12와 18의 최소공배수는 36이므로 36분 뒤인 7시 36분에 다시 만납니다.",
+    },
+  ],
+  9: [
+    {
+      id: "review-divisors",
+      prompt: "12의 약수를 모두 선택하세요.",
+      context: "약수 탐지 방어막을 해제하세요.",
+      options: ["1", "2", "3", "4", "5", "6", "12"],
+      answers: ["1", "2", "3", "4", "6", "12"],
+      multiple: true,
+      explanation: "12를 나누어떨어지게 하는 수는 1, 2, 3, 4, 6, 12입니다.",
+    },
+    {
+      id: "review-gcd",
+      prompt: "18과 24의 최대공약수는?",
+      context: "공약수 중 가장 큰 수를 선택하세요.",
+      options: ["3", "6", "9", "12"],
+      answers: ["6"],
+      explanation: "18과 24의 공약수 중 가장 큰 수는 6입니다.",
+    },
+    {
+      id: "review-lcm",
+      prompt: "14와 21의 최소공배수는?",
+      context: "공배수 중 가장 작은 수를 선택하세요.",
+      options: ["28", "35", "42", "84"],
+      answers: ["42"],
+      explanation: "42는 14×3이면서 21×2인 가장 작은 공배수입니다.",
+    },
+    {
+      id: "review-life",
+      prompt: "4일마다와 6일마다 하는 활동이 오늘 겹쳤습니다. 다시 겹치는 것은 며칠 뒤일까요?",
+      context: "생활 속 주기 문제에 최소공배수를 적용하세요.",
+      options: ["8일", "10일", "12일", "24일"],
+      answers: ["12일"],
+      explanation: "4와 6의 최소공배수는 12이므로 12일 뒤에 다시 겹칩니다.",
+    },
+  ],
+  10: [
+    {
+      id: "boss-divisor",
+      prompt: "보스 숫자 18의 약수를 모두 포착하세요.",
+      context: "제1 내성 · 약수 신호",
+      options: ["1", "2", "3", "4", "6", "9", "18"],
+      answers: ["1", "2", "3", "6", "9", "18"],
+      multiple: true,
+      explanation: "18은 1, 2, 3, 6, 9, 18로 나누어떨어집니다.",
+    },
+    {
+      id: "boss-multiple",
+      prompt: "보스 숫자 6의 배수 신호만 모두 선택하세요.",
+      context: "제2 내성 · 배수 신호",
+      options: ["12", "18", "20", "24"],
+      answers: ["12", "18", "24"],
+      multiple: true,
+      explanation: "12, 18, 24는 각각 6×2, 6×3, 6×4입니다.",
+    },
+    {
+      id: "boss-gcd",
+      prompt: "24와 36의 최대공약수는?",
+      context: "제3 내성 · 최대공약수 신호",
+      options: ["6", "8", "12", "18"],
+      answers: ["12"],
+      explanation: "24와 36을 모두 나누는 가장 큰 수는 12입니다.",
+    },
+    {
+      id: "boss-lcm",
+      prompt: "8과 12의 최소공배수는?",
+      context: "제4 내성 · 최소공배수 신호",
+      options: ["16", "20", "24", "48"],
+      answers: ["24"],
+      explanation: "24는 8×3이면서 12×2인 가장 작은 공배수입니다.",
+    },
+    {
+      id: "boss-life",
+      prompt: "15분과 20분 주기가 동시에 시작했습니다. 다시 겹치는 것은 몇 분 뒤일까요?",
+      context: "최종 내성 · 생활 속 주기 신호",
+      options: ["30분", "40분", "60분", "300분"],
+      answers: ["60분"],
+      explanation: "15와 20의 최소공배수는 60이므로 60분 뒤에 다시 겹칩니다.",
+    },
+  ],
+};
+
+export function isLearningAnswerCorrect(task: LearningTask, selected: string[]) {
+  if (selected.length !== task.answers.length) return false;
+  const answerSet = new Set(task.answers);
+  return selected.every((answer) => answerSet.has(answer));
+}
 
 export type StoryBattle = {
   board: Cell[];

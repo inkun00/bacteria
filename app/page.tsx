@@ -8,12 +8,15 @@ import "./free-battle.css";
 import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
 import {
   MODE_COPY,
+  STAGE_LEARNING_TASKS,
   STORY_STAGES,
   applyBossPulse,
   applyEmergencyTreatment,
   applyStoryMove,
   chooseStoryAiMove,
   createStoryBattle,
+  isLearningAnswerCorrect,
+  type LearningTask,
   type StoryBattle,
   type StoryStage,
 } from "./story";
@@ -40,6 +43,11 @@ const ENDING_CAPTIONS = [
 type View = "title" | "map" | "battle" | "free";
 type BattleResult = "clear" | "failed" | null;
 type CinematicKind = "opening" | "ending";
+type LearningGateState = {
+  taskIndex: number;
+  selected: string[];
+  status: "answering" | "wrong" | "correct";
+};
 
 function loadProgress() {
   if (typeof window === "undefined") return [] as number[];
@@ -248,6 +256,82 @@ function StagePanel({
   );
 }
 
+function LearningGate({
+  stage,
+  task,
+  state,
+  total,
+  onToggle,
+  onSubmit,
+  onAdvance,
+}: {
+  stage: StoryStage;
+  task: LearningTask;
+  state: LearningGateState;
+  total: number;
+  onToggle: (option: string) => void;
+  onSubmit: () => void;
+  onAdvance: () => void;
+}) {
+  const isBoss = !!stage.boss;
+  return (
+    <div className="learning-gate" role="dialog" aria-modal="true" aria-labelledby="learning-gate-title">
+      <section className={`learning-gate-card ${isBoss ? "boss" : ""}`}>
+        <div className="learning-gate-head">
+          <span className="learning-core-icon"><i /><i /><i /></span>
+          <div>
+            <small>{isBoss ? "BOSS RESISTANCE ANALYSIS" : "TREATMENT CORE UNLOCK"}</small>
+            <h2 id="learning-gate-title">{isBoss ? "보스의 학습 내성을 해제하세요" : "지역 해방 마지막 관문"}</h2>
+          </div>
+          <b>{state.taskIndex + 1}/{total}</b>
+        </div>
+
+        <div className="learning-gate-progress" aria-label={`학습 관문 ${state.taskIndex + 1}/${total}`}>
+          {Array.from({ length: total }, (_, index) => <i key={index} className={index <= state.taskIndex ? "active" : ""} />)}
+        </div>
+
+        <div className="learning-gate-copy">
+          <span>{task.context}</span>
+          <h3>{task.prompt}</h3>
+          {task.multiple && <p>정답을 모두 선택한 뒤 치료 신호를 전송하세요.</p>}
+        </div>
+
+        <div className={`learning-options ${task.multiple ? "multiple" : ""}`}>
+          {task.options.map((option) => {
+            const selected = state.selected.includes(option);
+            return (
+              <button
+                type="button"
+                key={option}
+                className={selected ? "selected" : ""}
+                aria-pressed={selected}
+                disabled={state.status === "correct"}
+                onClick={() => onToggle(option)}
+              >
+                <i>{selected ? "✓" : task.multiple ? "+" : "·"}</i>
+                <span>{option}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {state.status === "wrong" && <div className="learning-feedback wrong"><b>방어막 유지</b><span>선택을 다시 살펴보세요. 나눗셈이나 곱셈 관계를 확인하면 됩니다.</span></div>}
+        {state.status === "correct" && <div className="learning-feedback correct"><b>코어 해제 성공</b><span>{task.explanation}</span></div>}
+
+        <div className="learning-gate-actions">
+          {state.status === "correct" ? (
+            <button className="primary" type="button" onClick={onAdvance}>
+              {state.taskIndex + 1 === total ? isBoss ? "최종 치료 파장 발사" : "지역 해방 완료" : "다음 코어 분석"} →
+            </button>
+          ) : (
+            <button className="primary" type="button" disabled={!state.selected.length} onClick={onSubmit}>치료 신호 전송</button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function BattleBoard({
   battle,
   selected,
@@ -356,6 +440,7 @@ export default function Home() {
   const [result, setResult] = useState<BattleResult>(null);
   const [cinematic, setCinematic] = useState<CinematicKind | null>(null);
   const [freeBattle, setFreeBattle] = useState(false);
+  const [learningGate, setLearningGate] = useState<LearningGateState | null>(null);
   const timers = useRef<number[]>([]);
 
   const selectedStage = STORY_STAGES[selectedStageId - 1];
@@ -404,6 +489,7 @@ export default function Home() {
     setMoveCount(0);
     setBattleElapsed(0);
     setResult(null);
+    setLearningGate(null);
     setFlash({ infected: [], resisted: [] });
     setInfectionShot(null);
     setFeedback(`${MODE_COPY[stage.modes[0]].label} 준비 완료. ${stage.mission}`);
@@ -419,6 +505,7 @@ export default function Home() {
   }, [beginBattle, completed, selectedStage]);
 
   const finishBattle = useCallback((stage: StoryStage) => {
+    setLearningGate(null);
     persistCompletion(stage.id);
     setBusy(false);
     setTurn(1);
@@ -428,6 +515,20 @@ export default function Home() {
       setResult("clear");
     }
   }, [freeBattle, persistCompletion, schedule]);
+
+  const requestCompletion = useCallback((stage: StoryStage) => {
+    const tasks = STAGE_LEARNING_TASKS[stage.id] ?? [];
+    if (freeBattle || !tasks.length) {
+      finishBattle(stage);
+      return;
+    }
+    setBusy(false);
+    setTurn(1);
+    setSelectedCell(null);
+    setInfectionShot(null);
+    setFeedback("질병 세균 제거 완료 · 치료 코어의 학습 방어막을 해제하세요.");
+    setLearningGate({ taskIndex: 0, selected: [], status: "answering" });
+  }, [finishBattle, freeBattle]);
 
   const resolveAiTurn = useCallback((afterPlayer: StoryBattle) => {
     let working = afterPlayer;
@@ -454,7 +555,7 @@ export default function Home() {
         setInfectionShot({ from: recovery.sourceIndex, targets: [recovery.openedIndex], player: 1 });
         setFeedback(recovery.relationText);
         if (!recovery.battle.board.includes(2)) {
-          schedule(() => finishBattle(battleStage), 780);
+          schedule(() => requestCompletion(battleStage), 780);
           return;
         }
         schedule(() => {
@@ -491,7 +592,7 @@ export default function Home() {
       setInfectionShot({ from: recovery.sourceIndex, targets: [recovery.openedIndex], player: 1 });
       setFeedback(recovery.relationText);
       if (!recovery.battle.board.includes(2)) {
-        schedule(() => finishBattle(battleStage), 780);
+          schedule(() => requestCompletion(battleStage), 780);
         return;
       }
       schedule(() => {
@@ -508,7 +609,7 @@ export default function Home() {
       setTurn(1);
       setBusy(false);
     }, 650);
-  }, [battleStage, finishBattle, schedule]);
+  }, [battleStage, requestCompletion, schedule]);
 
   const executePlayerMove = useCallback((move: Move) => {
     setBusy(true);
@@ -523,12 +624,48 @@ export default function Home() {
     setFeedback(next.infected.length || next.bossHit ? next.relationText : `감염 조건 불일치. ${next.relationText}`);
     setMoveCount((value) => value + 1);
     if (!next.board.includes(2)) {
-      schedule(() => finishBattle(battleStage), 780);
+      schedule(() => requestCompletion(battleStage), 780);
       return;
     }
     setTurn(2);
     schedule(() => resolveAiTurn(next), battleStage.boss ? 1050 : 800);
-  }, [battle, battleStage, finishBattle, relationMode, resolveAiTurn, schedule]);
+  }, [battle, battleStage, relationMode, requestCompletion, resolveAiTurn, schedule]);
+
+  const learningTasks = STAGE_LEARNING_TASKS[battleStage.id] ?? [];
+  const activeLearningTask = learningGate ? learningTasks[learningGate.taskIndex] : null;
+
+  const toggleLearningOption = useCallback((option: string) => {
+    setLearningGate((current) => {
+      if (!current || current.status === "correct") return current;
+      const task = (STAGE_LEARNING_TASKS[battleStage.id] ?? [])[current.taskIndex];
+      if (!task) return current;
+      const selected = task.multiple
+        ? current.selected.includes(option)
+          ? current.selected.filter((item) => item !== option)
+          : [...current.selected, option]
+        : [option];
+      return { ...current, selected, status: "answering" };
+    });
+  }, [battleStage.id]);
+
+  const submitLearningAnswer = useCallback(() => {
+    setLearningGate((current) => {
+      if (!current) return current;
+      const task = (STAGE_LEARNING_TASKS[battleStage.id] ?? [])[current.taskIndex];
+      if (!task) return current;
+      return { ...current, status: isLearningAnswerCorrect(task, current.selected) ? "correct" : "wrong" };
+    });
+  }, [battleStage.id]);
+
+  const advanceLearningGate = useCallback(() => {
+    if (!learningGate) return;
+    if (learningGate.taskIndex + 1 < learningTasks.length) {
+      setLearningGate({ taskIndex: learningGate.taskIndex + 1, selected: [], status: "answering" });
+      return;
+    }
+    setLearningGate(null);
+    finishBattle(battleStage);
+  }, [battleStage, finishBattle, learningGate, learningTasks.length]);
 
   const handleCell = useCallback((index: number) => {
     if (busy || turn !== 1 || result) return;
@@ -731,7 +868,7 @@ export default function Home() {
           <section className="petri-learning-dock">
             <div><span><i /> {battleStage.lesson}</span><b>{MODE_COPY[relationMode].label}</b></div>
             <p>{battleStage.example}</p>
-            <div className="petri-mission-progress"><span>남은 질병 세균</span><i><em style={{ width: `${Math.max(0, Math.min(100, (therapyCaptures / Math.max(1, battleStage.enemyNumbers.length)) * 100))}%` }} /></i><b>{remainingDisease}</b></div>
+            <div className="petri-mission-progress"><span>{remainingDisease === 0 ? `학습 코어 ${learningTasks.length}개` : "남은 질병 세균"}</span><i><em style={{ width: `${Math.max(0, Math.min(100, (therapyCaptures / Math.max(1, battleStage.enemyNumbers.length)) * 100))}%` }} /></i><b>{remainingDisease === 0 ? "대기" : remainingDisease}</b></div>
           </section>
         </div>
       )}
@@ -749,6 +886,18 @@ export default function Home() {
             </div>
           </section>
         </div>
+      )}
+
+      {learningGate && activeLearningTask && (
+        <LearningGate
+          stage={battleStage}
+          task={activeLearningTask}
+          state={learningGate}
+          total={learningTasks.length}
+          onToggle={toggleLearningOption}
+          onSubmit={submitLearningAnswer}
+          onAdvance={advanceLearningGate}
+        />
       )}
 
       {cinematic && <Cinematic kind={cinematic} onFinish={handleCinematicFinish} />}

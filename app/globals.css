@@ -632,6 +632,46 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .petri-mission-progress > i { grid-column: 1 / -1; height: 3px; border-radius: 5px; background: #2b3028; overflow: hidden; }
 .petri-mission-progress em { display: block; height: 100%; background: var(--petri-cyan); }
 
+.learning-gate { position: fixed; inset: 0; z-index: 105; display: grid; place-items: center; padding: 22px; background: rgba(1,13,11,.9); backdrop-filter: blur(12px); }
+.learning-gate-card { width: min(660px,100%); max-height: calc(100vh - 44px); overflow-y: auto; padding: 28px; border: 1px solid rgba(46,229,208,.35); border-radius: 18px; background: radial-gradient(circle at 12% 0%, rgba(28,132,117,.2), transparent 32%), linear-gradient(145deg,#09231e,#061713 58%,#10251f); box-shadow: 0 28px 90px rgba(0,0,0,.65), inset 0 0 0 1px rgba(255,255,255,.025); }
+.learning-gate-card.boss { border-color: rgba(255,103,99,.45); background: radial-gradient(circle at 88% 0%, rgba(176,51,48,.23), transparent 34%), linear-gradient(145deg,#10251f,#141713 58%,#291713); }
+.learning-gate-head { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+.learning-gate-head small { display: block; margin-bottom: 6px; color: var(--petri-cyan); font: 800 8px/1 "IBM Plex Mono",monospace; letter-spacing: .16em; }
+.learning-gate-card.boss .learning-gate-head small { color: var(--petri-coral); }
+.learning-gate-head h2 { margin: 0; color: #e5f6f0; font-size: clamp(18px,3vw,25px); }
+.learning-gate-head > b { color: #91b7ac; font: 800 13px/1 "IBM Plex Mono",monospace; }
+.learning-core-icon { position: relative; width: 45px; height: 45px; display: grid; place-items: center; border: 1px solid rgba(46,229,208,.42); border-radius: 50%; box-shadow: 0 0 24px rgba(46,229,208,.14); }
+.learning-core-icon::before { content: ""; width: 13px; height: 13px; border-radius: 50%; background: var(--petri-cyan); box-shadow: 0 0 14px var(--petri-cyan); }
+.learning-core-icon i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #8ef5e7; }
+.learning-core-icon i:nth-child(1) { transform: translate(-15px,-8px); }
+.learning-core-icon i:nth-child(2) { transform: translate(14px,-9px); }
+.learning-core-icon i:nth-child(3) { transform: translate(0,16px); }
+.learning-gate-card.boss .learning-core-icon { border-color: rgba(255,103,99,.5); }
+.learning-gate-card.boss .learning-core-icon::before,.learning-gate-card.boss .learning-core-icon i { background: var(--petri-coral); box-shadow: 0 0 14px var(--petri-coral); }
+.learning-gate-progress { display: flex; gap: 5px; margin: 20px 0 24px; }
+.learning-gate-progress i { flex: 1; height: 3px; border-radius: 5px; background: rgba(114,151,140,.18); }
+.learning-gate-progress i.active { background: var(--petri-cyan); box-shadow: 0 0 8px rgba(46,229,208,.35); }
+.learning-gate-card.boss .learning-gate-progress i.active { background: var(--petri-coral); }
+.learning-gate-copy { padding: 18px 20px; border: 1px solid rgba(125,183,168,.14); border-radius: 12px; background: rgba(2,17,14,.52); }
+.learning-gate-copy > span { color: #72998f; font-size: 10px; }
+.learning-gate-copy h3 { margin: 8px 0 0; color: #f0faf7; font-size: clamp(17px,2.6vw,23px); line-height: 1.38; }
+.learning-gate-copy p { margin: 8px 0 0; color: #94aaa4; font-size: 10px; }
+.learning-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 14px; }
+.learning-options button { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 10px 13px; text-align: left; color: #b8cec8; border: 1px solid rgba(126,174,161,.2); border-radius: 10px; background: rgba(8,38,31,.72); transition: .16s ease; }
+.learning-options button:hover:not(:disabled) { border-color: rgba(46,229,208,.48); transform: translateY(-1px); }
+.learning-options button.selected { color: #eafff9; border-color: var(--petri-cyan); background: rgba(23,105,92,.55); box-shadow: inset 0 0 18px rgba(46,229,208,.08); }
+.learning-options button > i { flex: 0 0 auto; width: 23px; height: 23px; display: grid; place-items: center; border-radius: 6px; color: #68877f; background: #0e2a24; font-style: normal; font-weight: 900; }
+.learning-options button.selected > i { color: #06211b; background: var(--petri-cyan); }
+.learning-options button span { font-size: 12px; line-height: 1.35; }
+.learning-feedback { display: flex; gap: 12px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 10px; font-size: 11px; line-height: 1.5; }
+.learning-feedback b { flex: 0 0 auto; }
+.learning-feedback.wrong { color: #f5b4ae; border: 1px solid rgba(255,103,99,.28); background: rgba(100,28,24,.25); }
+.learning-feedback.correct { color: #b9eee3; border: 1px solid rgba(46,229,208,.28); background: rgba(14,91,78,.25); }
+.learning-gate-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+.learning-gate-actions button { min-width: 180px; min-height: 44px; padding: 0 18px; border: 1px solid rgba(46,229,208,.42); border-radius: 9px; color: #06221c; background: var(--petri-cyan); font-weight: 900; }
+.learning-gate-actions button:disabled { opacity: .35; cursor: not-allowed; }
+.learning-gate-card.boss .learning-gate-actions button { border-color: rgba(255,103,99,.55); color: #2b0c0a; background: var(--petri-coral); }
+
 @keyframes spriteIdle { from { background-position-x: 0%; } to { background-position-x: 100%; } }
 @keyframes spriteInfect { from { background-position-x: 0%; } to { background-position-x: 100%; } }
 @keyframes petriPulse { 50% { opacity: .35; box-shadow: 0 0 4px var(--petri-lime); } }
@@ -680,6 +720,12 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
   .petri-board-controls > button span { font-size: 14px; margin: 0; }
   .petri-learning-dock { margin-bottom: 70px; grid-template-columns: 1fr; }
   .petri-learning-dock p { display: none; }
+  .learning-gate { padding: 10px; }
+  .learning-gate-card { max-height: calc(100vh - 20px); padding: 18px; border-radius: 14px; }
+  .learning-gate-head { grid-template-columns: auto 1fr; }
+  .learning-gate-head > b { grid-column: 2; }
+  .learning-options { grid-template-columns: 1fr; }
+  .learning-gate-actions button { width: 100%; }
 }
 
 .result-overlay, .cinematic { position: fixed; inset: 0; z-index: 100; }
