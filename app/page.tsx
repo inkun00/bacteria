@@ -66,6 +66,11 @@ function stageModeLabel(modes: RelationMode[]) {
   return modes.map((mode) => MODE_COPY[mode].label.replace(" 모드", "")).join(" · ");
 }
 
+function nextAllowedMode(current: RelationMode, allowed: RelationMode[]) {
+  const currentIndex = allowed.indexOf(current);
+  return allowed[(currentIndex + 1) % allowed.length] ?? allowed[0] ?? current;
+}
+
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
   const remainder = (seconds % 60).toString().padStart(2, "0");
@@ -486,8 +491,16 @@ export default function Home() {
   const handleCell = useCallback((index: number) => {
     if (busy || turn !== 1 || result) return;
     if (battle.board[index] === 1) {
+      if (selectedCell === index) {
+        const nextMode = nextAllowedMode(relationMode, battleStage.modes);
+        setRelationMode(nextMode);
+        setFeedback(battleStage.modes.length === 1
+          ? `이번 작전은 ${MODE_COPY[nextMode].label}만 사용할 수 있어요.`
+          : `${battle.numbers[index]} 치료 세균을 ${MODE_COPY[nextMode].label}(으)로 바꿨어요. 다시 누르면 다음 모드로 전환됩니다.`);
+        return;
+      }
       setSelectedCell(index);
-      setFeedback(`${battle.numbers[index]} 치료 세균 선택 · 빈 칸으로 1칸 복제하거나 2칸 이동하세요.`);
+      setFeedback(`${battle.numbers[index]} 치료 세균 선택 · 같은 세균을 다시 누르면 ${stageModeLabel(battleStage.modes)} 모드가 순서대로 바뀝니다.`);
       return;
     }
     if (selectedCell === null || battle.board[index] !== 0) return;
@@ -498,14 +511,7 @@ export default function Home() {
       return;
     }
     executePlayerMove({ from: selectedCell, to: index, distance });
-  }, [battle.board, battle.numbers, busy, executePlayerMove, relationMode, result, selectedCell, turn]);
-
-  const chooseMode = (mode: RelationMode) => {
-    if (!battleStage.modes.includes(mode) || busy) return;
-    setRelationMode(mode);
-    setSelectedCell(null);
-    setFeedback(`${MODE_COPY[mode].label}: ${MODE_COPY[mode].explanation}`);
-  };
+  }, [battle.board, battle.numbers, battleStage.modes, busy, executePlayerMove, relationMode, result, selectedCell, turn]);
 
   const returnToMap = () => {
     timers.current.forEach((timer) => window.clearTimeout(timer));
@@ -649,18 +655,19 @@ export default function Home() {
               <div className="petri-board-controls">
                 <button onClick={returnToMap}><span>↶</span> 작전 지도</button>
                 <div className="petri-mode-controls" aria-label="치료 모드">
-                  {(Object.keys(MODE_COPY) as RelationMode[]).map((mode) => {
-                    const allowed = battleStage.modes.includes(mode);
-                    return (
-                      <button
-                        key={mode}
-                        className={`${relationMode === mode ? "active" : ""} ${!allowed ? "locked" : ""}`}
-                        disabled={!allowed || busy}
-                        onClick={() => chooseMode(mode)}
-                        title={allowed ? MODE_COPY[mode].explanation : "이번 차시에서는 사용할 수 없습니다."}
-                      ><i>{MODE_COPY[mode].short}</i><span>{MODE_COPY[mode].label}</span></button>
-                    );
-                  })}
+                  {selectedCell !== null ? (
+                    <button
+                      className={`petri-relation-toggle active ${relationMode}`}
+                      disabled={busy}
+                      onClick={() => handleCell(selectedCell)}
+                      title="선택한 세균을 다시 눌러 다음 모드로 바꿉니다."
+                    >
+                      <i>{MODE_COPY[relationMode].short}</i>
+                      <span><b>{MODE_COPY[relationMode].label}</b><small>{battleStage.modes.length > 1 ? "다시 눌러 모드 변경" : "이번 작전 전용"}</small></span>
+                    </button>
+                  ) : (
+                    <div className="petri-mode-prompt"><i>약</i><span><b>세균을 선택하세요</b><small>같은 세균을 다시 눌러 모드 변경</small></span></div>
+                  )}
                 </div>
                 <button onClick={() => beginBattle(battleStage, freeBattle)}><span>↻</span> 새 게임</button>
               </div>

@@ -64,6 +64,10 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(styles, /\.cinematic/);
   assert.match(page, /petri-battle-screen/);
   assert.match(page, /infection-projectile-layer/);
+  assert.match(page, /function nextAllowedMode/);
+  assert.match(page, /selectedCell === index/);
+  assert.match(page, /같은 세균을 다시 누르면/);
+  assert.match(page, /petri-relation-toggle/);
   assert.match(page, /bacteria-idle\.png/);
   assert.match(page, /bacteria-infection\.png/);
   assert.match(styles, /@keyframes spriteIdle/);
@@ -96,6 +100,7 @@ test("ships the title mode selector and restored classic free battle", async () 
   assert.match(freeBattle, /세균탄/);
   assert.match(freeBattle, /되돌리기/);
   assert.match(freeBattle, /chooseAiAction/);
+  assert.match(freeBattle, /nextMode\(relationMode\)/);
   assert.match(game, /export function applyMove/);
   assert.match(freeStyles, /\.free-battle \.setup-modal/);
   assert.match(freeStyles, /@keyframes infectionShot/);

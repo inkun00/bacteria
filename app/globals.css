@@ -607,12 +607,20 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .petri-board-controls > button:last-child { justify-self: end; }
 .petri-board-controls > button:hover { color: white; border-color: rgba(53,234,211,.35); }
 .petri-board-controls > button span { margin-right: 5px; color: var(--petri-cyan); }
-.petri-mode-controls { display: flex; gap: 5px; }
+.petri-mode-controls { min-width: 210px; display: flex; justify-content: center; gap: 5px; }
 .petri-mode-controls button { min-width: 72px; height: 36px; display: flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--petri-line); border-radius: 8px; color: #7f9c92; background: rgba(9,31,26,.85); cursor: pointer; font-size: 8px; }
 .petri-mode-controls button i { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; color: #9ab5ac; background: #17372e; font-style: normal; font-weight: 900; }
 .petri-mode-controls button.active { color: #dcfff8; border-color: rgba(53,234,211,.45); background: rgba(53,234,211,.1); }
 .petri-mode-controls button.active i { color: #05221d; background: var(--petri-cyan); }
 .petri-mode-controls button.locked { opacity: .25; cursor: not-allowed; }
+.petri-mode-controls .petri-relation-toggle { min-width: 205px; height: 42px; justify-content: flex-start; padding: 0 12px; }
+.petri-relation-toggle > span, .petri-mode-prompt > span { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.petri-relation-toggle b, .petri-mode-prompt b { color: #dcfff8; font-size: 9px; }
+.petri-relation-toggle small, .petri-mode-prompt small { color: #78988f; font-size: 7px; }
+.petri-mode-controls .petri-relation-toggle.multiple i { color: #291c05; background: #f1c65b; }
+.petri-mode-controls .petri-relation-toggle.split i { color: #1d0a2e; background: #d19aff; }
+.petri-mode-prompt { min-width: 205px; height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px dashed rgba(142,188,175,.2); border-radius: 8px; background: rgba(9,31,26,.45); }
+.petri-mode-prompt > i { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: #57776e; background: #132d27; font: 900 9px/1 "IBM Plex Mono", monospace; font-style: normal; }
 
 .petri-learning-dock { width: min(800px, calc(100% - 36px)); margin: 14px auto 0; min-height: 54px; display: grid; grid-template-columns: 1fr minmax(240px,2fr) 1fr; gap: 20px; align-items: center; padding: 10px 16px; border: 1px solid var(--petri-line); border-radius: 11px; background: linear-gradient(90deg, rgba(8,43,35,.84), rgba(19,30,23,.78), rgba(52,27,20,.7)); }
 .petri-learning-dock > div:first-child { color: #78a096; font-size: 8px; }
