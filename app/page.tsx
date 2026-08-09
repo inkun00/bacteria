@@ -10,6 +10,7 @@ import {
   MODE_COPY,
   STORY_STAGES,
   applyBossPulse,
+  applyEmergencyTreatment,
   applyStoryMove,
   chooseStoryAiMove,
   createStoryBattle,
@@ -437,10 +438,33 @@ export default function Home() {
       if (pulse.relationText) setFeedback(pulse.relationText);
       setFlash({ infected: pulse.infected, resisted: [] });
       setInfectionShot(pulse.infected.length ? { from: working.bossIndex ?? 24, targets: pulse.infected, player: 2 } : null);
+      if (!working.board.includes(1)) {
+        setResult("failed");
+        setBusy(false);
+        return;
+      }
     }
 
     const action = chooseStoryAiMove(working, battleStage);
     if (!action) {
+      const recovery = applyEmergencyTreatment(working, battleStage);
+      if (recovery) {
+        setBattle(recovery.battle);
+        setFlash({ infected: [recovery.openedIndex], resisted: [] });
+        setInfectionShot({ from: recovery.sourceIndex, targets: [recovery.openedIndex], player: 1 });
+        setFeedback(recovery.relationText);
+        if (!recovery.battle.board.includes(2)) {
+          schedule(() => finishBattle(battleStage), 780);
+          return;
+        }
+        schedule(() => {
+          setFlash({ infected: [], resisted: [] });
+          setInfectionShot(null);
+          setTurn(1);
+          setBusy(false);
+        }, 700);
+        return;
+      }
       setTurn(1);
       setBusy(false);
       setInfectionShot(null);
@@ -460,13 +484,31 @@ export default function Home() {
       setBusy(false);
       return;
     }
+    const recovery = applyEmergencyTreatment(enemyResult, battleStage);
+    if (recovery) {
+      setBattle(recovery.battle);
+      setFlash({ infected: [recovery.openedIndex], resisted: [] });
+      setInfectionShot({ from: recovery.sourceIndex, targets: [recovery.openedIndex], player: 1 });
+      setFeedback(recovery.relationText);
+      if (!recovery.battle.board.includes(2)) {
+        schedule(() => finishBattle(battleStage), 780);
+        return;
+      }
+      schedule(() => {
+        setFlash({ infected: [], resisted: [] });
+        setInfectionShot(null);
+        setTurn(1);
+        setBusy(false);
+      }, 700);
+      return;
+    }
     schedule(() => {
       setFlash({ infected: [], resisted: [] });
       setInfectionShot(null);
       setTurn(1);
       setBusy(false);
     }, 650);
-  }, [battleStage, schedule]);
+  }, [battleStage, finishBattle, schedule]);
 
   const executePlayerMove = useCallback((move: Move) => {
     setBusy(true);

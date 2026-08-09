@@ -391,6 +391,73 @@ export function chooseStoryAiMove(battle: StoryBattle, stage: StoryStage): { mov
   return scored[Math.floor(Math.random() * looseness)] ?? null;
 }
 
+export type StoryRecovery = {
+  battle: StoryBattle;
+  sourceIndex: number;
+  openedIndex: number;
+  relationText: string;
+};
+
+function boardDistance(from: number, to: number, size: number) {
+  const fromRow = Math.floor(from / size);
+  const fromCol = from % size;
+  const toRow = Math.floor(to / size);
+  const toCol = to % size;
+  return Math.max(Math.abs(fromRow - toRow), Math.abs(fromCol - toCol));
+}
+
+export function applyEmergencyTreatment(battle: StoryBattle, stage: StoryStage): StoryRecovery | null {
+  if (legalMoves(battle.board, 1).length || !battle.board.includes(1) || !battle.board.includes(2)) return null;
+
+  const board = [...battle.board];
+  const numbers = [...battle.numbers];
+  const size = getBoardSize(board);
+  const therapyCells = board.flatMap((cell, index) => cell === 1 ? [index] : []);
+  const livingBossIndex = stage.boss && battle.bossHp > 0 ? battle.bossIndex : null;
+  const removableDisease = board.flatMap((cell, index) => cell === 2 && index !== livingBossIndex ? [index] : []);
+
+  if (removableDisease.length) {
+    const target = removableDisease
+      .map((index) => ({
+        index,
+        source: therapyCells.reduce((best, candidate) =>
+          boardDistance(candidate, index, size) < boardDistance(best, index, size) ? candidate : best, therapyCells[0]),
+      }))
+      .sort((left, right) => boardDistance(left.source, left.index, size) - boardDistance(right.source, right.index, size))[0];
+    board[target.index] = 0;
+    numbers[target.index] = null;
+    return {
+      battle: { ...battle, board, numbers },
+      sourceIndex: target.source,
+      openedIndex: target.index,
+      relationText: "이동 가능한 칸이 없어 연구소가 긴급 치료 파동을 발사했습니다. 가장 가까운 질병 세균 1개가 제거되어 작전을 계속할 수 있어요.",
+    };
+  }
+
+  if (livingBossIndex !== null && therapyCells.length > 1) {
+    const candidates = therapyCells
+      .map((openedIndex) => ({
+        openedIndex,
+        sourceIndex: therapyCells.find((sourceIndex) => sourceIndex !== openedIndex && boardDistance(sourceIndex, openedIndex, size) <= 2),
+      }))
+      .filter((candidate): candidate is { openedIndex: number; sourceIndex: number } => candidate.sourceIndex !== undefined)
+      .sort((left, right) => boardDistance(left.openedIndex, livingBossIndex, size) - boardDistance(right.openedIndex, livingBossIndex, size));
+    const opening = candidates[0];
+    if (opening) {
+      board[opening.openedIndex] = 0;
+      numbers[opening.openedIndex] = null;
+      return {
+        battle: { ...battle, board, numbers },
+        sourceIndex: opening.sourceIndex,
+        openedIndex: opening.openedIndex,
+        relationText: "보스 공격 공간이 막혀 연구소가 치료 세균 1개를 회수했습니다. 열린 칸으로 이동해 보스 치료를 계속하세요.",
+      };
+    }
+  }
+
+  return null;
+}
+
 export function applyBossPulse(battle: StoryBattle, stage: StoryStage): StoryMoveResult {
   if (!stage.boss || battle.bossIndex === null || battle.bossHp <= 0) {
     return { ...battle, infected: [], resisted: [], relationText: "", bossHit: false };

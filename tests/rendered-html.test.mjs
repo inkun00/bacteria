@@ -45,6 +45,10 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(page, /factor-force-story-progress-v2/);
   assert.match(page, /LEGACY_STORY_SAVE_KEY/);
   assert.match(page, /applyBossPulse/);
+  assert.match(page, /applyEmergencyTreatment/);
+  assert.match(story, /export function applyEmergencyTreatment/);
+  assert.match(story, /긴급 치료 파동/);
+  assert.match(story, /보스 공격 공간/);
   const stageIds = [...story.matchAll(/^\s{4}id: (\d+),$/gm)].map((match) => Number(match[1]));
   assert.deepEqual(stageIds, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   for (let lesson = 2; lesson <= 10; lesson += 1) {
