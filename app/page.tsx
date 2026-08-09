@@ -28,9 +28,13 @@ const BOSS_STAGE_ID = STORY_STAGES[STORY_STAGE_COUNT - 1].id;
 
 const OPENING_CAPTIONS = [
   "서기 2042년, 숫자를 바꾸며 증식하는 질병 세균이 지구 전역에 나타났다.",
-  "약수와 배수의 감염망이 완성되면 지구의 모든 생명은 멈추고 만다.",
-  "수학 연구소는 질병 세균을 역감염시키는 ‘치료 세균’을 개발했다.",
-  "세계의 감염 지역을 해방하고, 태평양의 원천균을 제거하라!",
+  "숫자가 새겨진 질병 세균은 도시의 교통과 전력망을 타고 번졌고, 사람들의 일상은 하나씩 멈춰 갔다.",
+  "세균들은 아무렇게나 움직이지 않았다. 약수와 배수 관계를 따라 연결되며 거대한 감염망을 완성하고 있었다.",
+  "연구진은 감염 숫자의 규칙을 추적한 끝에, 올바른 약수와 배수 신호가 세균의 방어막을 무너뜨린다는 사실을 발견했다.",
+  "수학 연구소는 그 원리를 이용해 질병 세균을 역감염시키는 ‘치료 세균’을 개발했다.",
+  "첫 실험은 성공했다. 치료 세균은 정확한 숫자 관계를 찾아 붉은 질병 세균을 안전한 치료 세균으로 바꾸었다.",
+  "세계 방어대는 치료 세균을 각 대륙에 투입했다. 이제 감염 지역을 하나씩 해방할 시간이었다.",
+  "그러나 모든 감염 신호의 끝에는 태평양 무인도의 원천균이 있었다. 세계를 구할 마지막 작전이 시작된다.",
 ];
 
 const ENDING_CAPTIONS = [
@@ -151,21 +155,33 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
   const captions = kind === "opening" ? OPENING_CAPTIONS : ENDING_CAPTIONS;
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const sceneImages = kind === "opening"
-    ? ["opening.png", "opening-02.png", "opening-03.png", "opening-04.png"]
+    ? [
+      "opening.png",
+      "opening-bridge-01.png",
+      "opening-02.png",
+      "opening-bridge-02.png",
+      "opening-03.png",
+      "opening-bridge-03.png",
+      "opening-04.png",
+      "opening-bridge-04.png",
+    ]
     : ["ending.png"];
   const sceneImage = sceneImages[Math.min(captionIndex, sceneImages.length - 1)];
 
   useEffect(() => {
+    const sceneDuration = kind === "opening"
+      ? captionIndex === 0 ? 6400 : 5600
+      : captionIndex === 0 ? 3200 : 2800;
     const timer = window.setTimeout(() => {
       if (captionIndex < captions.length - 1) setCaptionIndex((value) => value + 1);
       else onFinish();
-    }, captionIndex === 0 ? 3200 : 2800);
+    }, sceneDuration);
     return () => window.clearTimeout(timer);
-  }, [captionIndex, captions.length, onFinish]);
+  }, [captionIndex, captions.length, kind, onFinish]);
 
   return (
     <div className="cinematic" role="dialog" aria-modal="true" aria-label={kind === "opening" ? "오프닝" : "엔딩"}>
-      <img key={`${kind}-${captionIndex}`} src={`${basePath}/assets/story/${sceneImage}`} alt="" />
+      <img className={kind === "opening" ? "opening-scene" : ""} key={`${kind}-${captionIndex}`} src={`${basePath}/assets/story/${sceneImage}`} alt="" />
       <div className="cinematic-vignette" />
       <div className="cinematic-topline">
         <span>{kind === "opening" ? "FACTOR FORCE · PROLOGUE" : "FACTOR FORCE · EPILOGUE"}</span>

@@ -743,6 +743,7 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 
 .cinematic { background: #020813; overflow: hidden; }
 .cinematic img { width: 100%; height: 100%; object-fit: cover; animation: cinematicSceneIn .7s ease both, cinematicZoom 3.4s linear both; }
+.cinematic img.opening-scene { animation-duration: 1.4s, 6.8s; }
 @keyframes cinematicSceneIn { from { opacity: 0; filter: brightness(.55); } to { opacity: 1; filter: brightness(1); } }
 @keyframes cinematicZoom { from { transform: scale(1.01); } to { transform: scale(1.055); } }
 .cinematic-vignette { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.15), transparent 50%, rgba(2,9,20,.94)); box-shadow: inset 0 0 130px rgba(0,0,0,.42); }
