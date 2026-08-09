@@ -184,9 +184,14 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
   position: relative;
   min-height: 680px;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at center, rgba(24, 101, 115, .25), transparent 67%),
-    linear-gradient(180deg, rgba(12, 31, 51, .3), rgba(5, 17, 31, .62));
+  background-color: #061426;
+  background-image:
+    linear-gradient(180deg, rgba(4, 14, 28, .04), rgba(4, 14, 28, .22)),
+    url("/assets/story/world-operation-map.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  box-shadow: inset 0 0 65px rgba(1, 8, 18, .58);
 }
 
 .world-map::before {
@@ -202,6 +207,7 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .map-grid {
   position: absolute;
   inset: 0;
+  opacity: .16;
   background-image: linear-gradient(rgba(80,151,171,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(80,151,171,.07) 1px, transparent 1px);
   background-size: 9.09% 12.5%;
   transform: perspective(800px) rotateX(4deg);
@@ -209,19 +215,21 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 
 .continent {
   position: absolute;
-  background: linear-gradient(145deg, rgba(37, 108, 112, .72), rgba(15, 67, 75, .76));
-  border: 1px solid rgba(86, 190, 181, .23);
-  box-shadow: inset 0 0 28px rgba(67,229,218,.06), 0 0 34px rgba(0,0,0,.16);
-  filter: drop-shadow(0 8px 14px rgba(0,0,0,.25));
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  filter: none;
+  pointer-events: none;
 }
 
-.continent span { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(148, 217, 211, .34); font: 700 9px/1 "IBM Plex Mono", monospace; letter-spacing: .08em; }
+.continent span { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(155, 219, 222, .48); font: 700 9px/1 "IBM Plex Mono", monospace; letter-spacing: .12em; text-shadow: 0 2px 8px #00101d; }
 .north-america { left: 7%; top: 18%; width: 25%; height: 26%; border-radius: 52% 39% 48% 45% / 45% 38% 58% 51%; clip-path: polygon(0 8%, 45% 0, 88% 18%, 100% 40%, 70% 54%, 68% 100%, 40% 79%, 28% 53%, 5% 42%); }
 .south-america { left: 28%; top: 49%; width: 15%; height: 35%; border-radius: 45% 50% 65% 34%; clip-path: polygon(5% 0, 84% 5%, 100% 30%, 72% 52%, 50% 100%, 25% 70%, 20% 40%); transform: rotate(-8deg); }
 .europe { left: 45%; top: 25%; width: 14%; height: 14%; border-radius: 50% 37% 60% 45%; clip-path: polygon(0 28%, 45% 0, 98% 20%, 78% 100%, 20% 75%); }
 .africa { left: 46%; top: 40%; width: 17%; height: 34%; border-radius: 55% 45% 68% 38%; clip-path: polygon(8% 0, 89% 2%, 100% 30%, 60% 100%, 33% 82%, 5% 35%); }
 .asia { left: 57%; top: 16%; width: 34%; height: 38%; border-radius: 33% 58% 44% 62%; clip-path: polygon(0 30%, 15% 5%, 64% 0, 100% 28%, 90% 65%, 68% 55%, 58% 100%, 37% 69%, 12% 74%); }
 .oceania { left: 78%; top: 64%; width: 16%; height: 16%; border-radius: 60% 40% 65% 35%; clip-path: polygon(0 35%, 36% 5%, 100% 45%, 82% 90%, 30% 100%); }
+.north-america, .south-america, .europe, .africa, .asia, .oceania { clip-path: none; border-radius: 0; transform: none; }
 .map-route { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, transparent 0 55%, rgba(67,229,218,.03) 56% 57%, transparent 58%); }
 
 .stage-pin {

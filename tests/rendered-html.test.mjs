@@ -25,13 +25,14 @@ test("server-renders the Korean Factor Force shell", async () => {
 });
 
 test("ships the 11-stage story campaign, boss mechanics, and cinematic assets", async () => {
-  const [layout, page, story, styles, opening, ending] = await Promise.all([
+  const [layout, page, story, styles, opening, ending, worldMap] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/story.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     access(new URL("../public/assets/story/opening.png", import.meta.url)),
     access(new URL("../public/assets/story/ending.png", import.meta.url)),
+    access(new URL("../public/assets/story/world-operation-map.png", import.meta.url)),
   ]);
 
   assert.match(layout, /Factor Force \| 약수와 배수 지구 방어대/);
@@ -49,7 +50,9 @@ test("ships the 11-stage story campaign, boss mechanics, and cinematic assets", 
   assert.match(story, /2차시 · 약수 이해하기/);
   assert.match(story, /9차시 · 생활 속 최소공배수/);
   assert.match(styles, /\.world-map/);
+  assert.match(styles, /world-operation-map\.png/);
   assert.match(styles, /\.cinematic/);
   assert.equal(opening, undefined);
   assert.equal(ending, undefined);
+  assert.equal(worldMap, undefined);
 });
