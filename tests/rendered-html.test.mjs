@@ -20,7 +20,7 @@ test("server-renders the Korean Factor Force shell", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="ko">/i);
   assert.match(html, /Factor Force \| 약수와 배수 지구 방어대/);
-  assert.match(html, /치료 세균을 배양하는 중/);
+  assert.match(html, /치료 세균을 만드는 중/);
   assert.doesNotMatch(html, /react-loading-skeleton|codex-preview/i);
 });
 
@@ -47,8 +47,8 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(page, /applyBossPulse/);
   assert.match(page, /applyEmergencyTreatment/);
   assert.match(story, /export function applyEmergencyTreatment/);
-  assert.match(story, /긴급 치료 파동/);
-  assert.match(story, /보스 공격 공간/);
+  assert.match(story, /긴급 치료 빛/);
+  assert.match(story, /보스에게 다가갈 칸/);
   const stageIds = [...story.matchAll(/^\s{4}id: (\d+),$/gm)].map((match) => Number(match[1]));
   assert.deepEqual(stageIds, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   for (let lesson = 2; lesson <= 10; lesson += 1) {
@@ -57,7 +57,7 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(story, /id: 10/);
   assert.doesNotMatch(story, /1차시 · 단원 도입/);
   assert.doesNotMatch(story, /감염 경보: 서울/);
-  assert.match(story, /원천균: 제로 프라임/);
+  assert.match(story, /우두머리 세균: 제로 프라임/);
   assert.match(story, /hp: 5/);
   assert.match(story, /sequence: \[12, 18, 24, 30, 36\]/);
   assert.match(story, /modes: \["divisor", "multiple", "split"\]/);
@@ -73,10 +73,12 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(page, /같은 세균을 다시 누르면/);
   assert.match(page, /petri-relation-toggle/);
   assert.match(page, /learning-short-answer/);
-  assert.match(page, /단답형 정답/);
+  assert.match(page, /답 직접 쓰기/);
   assert.equal((story.match(/shortAnswer: true/g) ?? []).length, 24);
   assert.equal((story.match(/^    crisis: /gm) ?? []).length, 10);
-  assert.match(page, /REGION CRISIS · 지역 위기 상황/);
+  assert.match(page, /지역 위기 상황/);
+  assert.doesNotMatch(page, /학습 내성|치료 코어|역감염|REGION CRISIS|MISSION OBJECTIVE/);
+  assert.doesNotMatch(story, /합성수|원천균|변이|내성|치료 파동/);
   assert.match(page, /bacteria-idle\.png/);
   assert.match(page, /bacteria-infection\.png/);
   assert.match(styles, /@keyframes spriteIdle/);

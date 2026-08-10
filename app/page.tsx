@@ -27,20 +27,20 @@ const STORY_STAGE_COUNT = STORY_STAGES.length;
 const BOSS_STAGE_ID = STORY_STAGES[STORY_STAGE_COUNT - 1].id;
 
 const OPENING_CAPTIONS = [
-  "서기 2042년, 숫자를 바꾸며 증식하는 질병 세균이 지구 전역에 나타났다.",
-  "숫자가 새겨진 질병 세균은 도시의 교통과 전력망을 타고 번졌고, 사람들의 일상은 하나씩 멈춰 갔다.",
-  "세균들은 아무렇게나 움직이지 않았다. 약수와 배수 관계를 따라 연결되며 거대한 감염망을 완성하고 있었다.",
-  "연구진은 감염 숫자의 규칙을 추적한 끝에, 올바른 약수와 배수 신호가 세균의 방어막을 무너뜨린다는 사실을 발견했다.",
-  "수학 연구소는 그 원리를 이용해 질병 세균을 역감염시키는 ‘치료 세균’을 개발했다.",
+  "2042년, 숫자를 바꾸며 빠르게 늘어나는 질병 세균이 지구 곳곳에 나타났다.",
+  "숫자가 새겨진 질병 세균은 도시의 교통 시설과 전기 시설을 따라 퍼졌고, 사람들의 일상은 하나씩 멈춰 갔다.",
+  "세균들은 아무렇게나 움직이지 않았다. 약수와 배수 관계를 따라 이어지며 커다란 감염 길을 만들고 있었다.",
+  "연구원들은 감염된 숫자의 규칙을 살핀 끝에, 올바른 약수와 배수 관계를 찾으면 세균을 치료할 수 있다는 사실을 알아냈다.",
+  "수학 연구소는 그 원리를 이용해 질병 세균을 치료 세균으로 바꾸는 ‘치료 세균’을 만들었다.",
   "첫 실험은 성공했다. 치료 세균은 정확한 숫자 관계를 찾아 붉은 질병 세균을 안전한 치료 세균으로 바꾸었다.",
-  "세계 방어대는 치료 세균을 각 대륙에 투입했다. 이제 감염 지역을 하나씩 해방할 시간이었다.",
-  "그러나 모든 감염 신호의 끝에는 태평양 무인도의 원천균이 있었다. 세계를 구할 마지막 작전이 시작된다.",
+  "세계 방어대는 치료 세균을 각 대륙으로 보냈다. 이제 감염된 지역을 하나씩 구할 시간이었다.",
+  "그러나 모든 감염의 시작에는 태평양 무인도의 우두머리 세균이 있었다. 세계를 구할 마지막 작전이 시작된다.",
 ];
 
 const ENDING_CAPTIONS = [
-  "마지막 치료 파장이 원천균의 숫자 방어막을 무너뜨렸다.",
+  "마지막 치료 빛이 우두머리 세균의 숫자 방어막을 무너뜨렸다.",
   "남아 있던 질병 세균은 모두 치료 세균으로 바뀌었다.",
-  "해방된 대륙에 생명이 돌아오고, 지구는 다시 푸르게 빛났다.",
+  "세균에서 벗어난 대륙에 생명이 돌아오고, 지구는 다시 푸르게 빛났다.",
   "임무 완료. 약수와 배수로 지켜 낸 우리의 행성에 평화가 찾아왔다.",
 ];
 
@@ -125,7 +125,7 @@ function TitleScreen({ onStory, onFree }: { onStory: () => void; onFree: () => v
       <div className="title-vignette" />
       <div className="title-grid" aria-hidden="true" />
       <section className="title-content">
-        <div className="title-kicker"><i /> PETRI MATH LAB // GLOBAL RESPONSE</div>
+        <div className="title-kicker"><i /> 페트리 수학 연구소 // 지구 구출 작전</div>
         <div className="title-logo-lockup">
           <Germ player={1} />
           <div>
@@ -138,13 +138,13 @@ function TitleScreen({ onStory, onFree }: { onStory: () => void; onFree: () => v
         <p className="title-tagline">숫자의 관계를 찾아 감염을 뒤집고 지구를 구하라.</p>
         <div className="title-actions">
           <button className="story-launch" onClick={onStory}>
-            <span><small>CAMPAIGN</small><b>스토리 모드</b><em>세계 감염 지역을 차례로 해방하세요</em></span><i>→</i>
+            <span><small>이야기 작전</small><b>스토리 모드</b><em>감염된 세계 여러 지역을 차례로 구하세요</em></span><i>→</i>
           </button>
           <button className="free-launch" onClick={onFree}>
-            <span><small>CLASSIC BATTLE</small><b>자유 대전</b><em>원본 수학 세균전 규칙으로 대전하세요</em></span><i>→</i>
+            <span><small>자유롭게 겨루기</small><b>자유 대전</b><em>처음 수학 세균전 규칙으로 겨루세요</em></span><i>→</i>
           </button>
         </div>
-        <footer><span>FACTOR FORCE</span><i /> <span>VERSION 07.26</span></footer>
+        <footer><span>FACTOR FORCE</span><i /> <span>버전 07.26</span></footer>
       </section>
     </main>
   );
@@ -184,7 +184,7 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
       <img className={kind === "opening" ? "opening-scene" : ""} key={`${kind}-${captionIndex}`} src={`${basePath}/assets/story/${sceneImage}`} alt="" />
       <div className="cinematic-vignette" />
       <div className="cinematic-topline">
-        <span>{kind === "opening" ? "FACTOR FORCE · PROLOGUE" : "FACTOR FORCE · EPILOGUE"}</span>
+        <span>{kind === "opening" ? "FACTOR FORCE · 이야기 시작" : "FACTOR FORCE · 이야기 끝"}</span>
         <button onClick={onFinish}>건너뛰기 <i>››</i></button>
       </div>
       <div className="cinematic-copy" key={captionIndex}>
@@ -230,11 +230,11 @@ function WorldMap({
             aria-label={`${stage.id} 스테이지 ${stage.title}${isUnlocked ? "" : " 잠김"}`}
           >
             <span>{isComplete ? "✓" : isUnlocked ? stage.id : "⌁"}</span>
-            <em>{stage.id === BOSS_STAGE_ID ? "BOSS" : stage.place.split(" · ")[1]}</em>
+            <em>{stage.id === BOSS_STAGE_ID ? "보스" : stage.place.split(" · ")[1]}</em>
           </button>
         );
       })}
-      <div className="map-legend"><span><i className="complete" /> 해방 완료</span><span><i className="current" /> 작전 가능</span><span><i className="danger" /> 감염 지역</span></div>
+      <div className="map-legend"><span><i className="complete" /> 구하기 완료</span><span><i className="current" /> 작전 가능</span><span><i className="danger" /> 감염 지역</span></div>
     </section>
   );
 }
@@ -253,20 +253,20 @@ function StagePanel({
   return (
     <aside className="stage-panel">
       <div className="stage-panel-head">
-        <span className="stage-number">{stage.id === BOSS_STAGE_ID ? "BOSS" : `0${stage.id}`.slice(-2)}</span>
+        <span className="stage-number">{stage.id === BOSS_STAGE_ID ? "보스" : `0${stage.id}`.slice(-2)}</span>
         <div><small>{stage.lesson}</small><h2>{stage.title}</h2></div>
       </div>
       <div className="location-line"><i>⌖</i> {stage.place} <span>{stage.continent}</span></div>
       <div className="crisis-box">
-        <small><i /> REGION CRISIS · 지역 위기 상황</small>
+        <small><i /> 지역 위기 상황</small>
         <p>{stage.crisis}</p>
       </div>
       <div className="stage-response">
-        <small>RESEARCH RESPONSE · 연구소 대응 계획</small>
+        <small>연구소의 해결 계획</small>
         <p className="stage-story">{stage.story}</p>
       </div>
       <div className="mission-box">
-        <small>MISSION OBJECTIVE</small>
+        <small>작전 목표</small>
         <strong>{stage.mission}</strong>
       </div>
       <dl className="stage-facts">
@@ -276,7 +276,7 @@ function StagePanel({
       </dl>
       <div className="difficulty-line"><span>위험도</span><div>{[1, 2, 3].map((level) => <i key={level} className={level <= stage.difficulty ? "on" : ""} />)}</div></div>
       <button className="deploy-button" disabled={locked} onClick={onStart}>
-        {locked ? "이전 지역을 먼저 해방하세요" : complete ? "다시 작전하기" : stage.id === 1 ? "오프닝부터 시작" : "치료 세균 투입"}
+        {locked ? "이전 지역을 먼저 구하세요" : complete ? "다시 작전하기" : stage.id === 1 ? "이야기부터 시작" : "치료 세균 보내기"}
         {!locked && <span>→</span>}
       </button>
     </aside>
@@ -307,26 +307,26 @@ function LearningGate({
         <div className="learning-gate-head">
           <span className="learning-core-icon"><i /><i /><i /></span>
           <div>
-            <small>{isBoss ? "BOSS RESISTANCE ANALYSIS" : "TREATMENT CORE UNLOCK"}</small>
-            <h2 id="learning-gate-title">{isBoss ? "보스의 학습 내성을 해제하세요" : "지역 해방 마지막 관문"}</h2>
+            <small>{isBoss ? "보스 마지막 확인 문제" : "지역 마지막 확인 문제"}</small>
+            <h2 id="learning-gate-title">{isBoss ? "배운 내용을 떠올려 보스를 물리치세요" : "지역을 구하는 마지막 문제"}</h2>
           </div>
           <b>{state.taskIndex + 1}/{total}</b>
         </div>
 
-        <div className="learning-gate-progress" aria-label={`학습 관문 ${state.taskIndex + 1}/${total}`}>
+        <div className="learning-gate-progress" aria-label={`확인 문제 ${state.taskIndex + 1}/${total}`}>
           {Array.from({ length: total }, (_, index) => <i key={index} className={index <= state.taskIndex ? "active" : ""} />)}
         </div>
 
         <div className="learning-gate-copy">
           <span>{task.context}</span>
           <h3>{task.prompt}</h3>
-          {task.multiple && <p>정답을 모두 선택한 뒤 치료 신호를 전송하세요.</p>}
-          {task.shortAnswer && <p>계산한 답을 직접 입력한 뒤 치료 신호를 전송하세요.</p>}
+          {task.multiple && <p>정답을 모두 고른 뒤 정답을 확인하세요.</p>}
+          {task.shortAnswer && <p>계산한 답을 직접 쓴 뒤 정답을 확인하세요.</p>}
         </div>
 
         {task.shortAnswer ? (
           <div className="learning-short-answer">
-            <label htmlFor={`learning-answer-${task.id}`}>단답형 정답</label>
+            <label htmlFor={`learning-answer-${task.id}`}>답 직접 쓰기</label>
             <input
               id={`learning-answer-${task.id}`}
               inputMode="numeric"
@@ -359,16 +359,16 @@ function LearningGate({
           })}
         </div>}
 
-        {state.status === "wrong" && <div className="learning-feedback wrong"><b>방어막 유지</b><span>선택을 다시 살펴보세요. 나눗셈이나 곱셈 관계를 확인하면 됩니다.</span></div>}
-        {state.status === "correct" && <div className="learning-feedback correct"><b>코어 해제 성공</b><span>{task.explanation}</span></div>}
+        {state.status === "wrong" && <div className="learning-feedback wrong"><b>다시 생각해 보세요</b><span>고른 답을 다시 살펴보세요. 나눗셈이나 곱셈 관계를 확인하면 됩니다.</span></div>}
+        {state.status === "correct" && <div className="learning-feedback correct"><b>정답이에요</b><span>{task.explanation}</span></div>}
 
         <div className="learning-gate-actions">
           {state.status === "correct" ? (
             <button className="primary" type="button" onClick={onAdvance}>
-              {state.taskIndex + 1 === total ? isBoss ? "최종 치료 파장 발사" : "지역 해방 완료" : "다음 코어 분석"} →
+              {state.taskIndex + 1 === total ? isBoss ? "마지막 치료 빛 보내기" : "지역 구하기 완료" : "다음 문제"} →
             </button>
           ) : (
-            <button className="primary" type="button" disabled={!state.selected.some((value) => value.trim())} onClick={onSubmit}>치료 신호 전송</button>
+            <button className="primary" type="button" disabled={!state.selected.some((value) => value.trim())} onClick={onSubmit}>정답 확인</button>
           )}
         </div>
       </section>
@@ -418,7 +418,7 @@ function BattleBoard({
             onMouseEnter={() => onHover(index)}
             onMouseLeave={() => onHover(null)}
             disabled={disabled}
-            aria-label={cell === 0 ? `빈 칸 ${index + 1}` : `${cell === 1 ? "치료" : "질병"} 세균 ${number}${isBoss ? `, 보스 내성 ${battle.bossHp}` : ""}`}
+            aria-label={cell === 0 ? `빈 칸 ${index + 1}` : `${cell === 1 ? "치료" : "질병"} 세균 ${number}${isBoss ? `, 앞으로 ${battle.bossHp}번 더 치료` : ""}`}
           >
             <span className="cell-gridmark" />
             {cell !== 0 && number !== null && (
@@ -570,7 +570,7 @@ export default function Home() {
     setTurn(1);
     setSelectedCell(null);
     setInfectionShot(null);
-    setFeedback("질병 세균 제거 완료 · 치료 코어의 학습 방어막을 해제하세요.");
+    setFeedback("질병 세균을 모두 없앴어요. 지역을 구하는 마지막 문제를 풀어 보세요.");
     setLearningGate({ taskIndex: 0, selected: [], status: "answering" });
   }, [finishBattle, freeBattle]);
 
@@ -621,7 +621,7 @@ export default function Home() {
     setFlash({ infected: enemyResult.infected, resisted: enemyResult.resisted });
     setInfectionShot(enemyResult.infected.length ? { from: action.move.to, targets: enemyResult.infected, player: 2 } : null);
     setFeedback(enemyResult.infected.length
-      ? `역감염 발생! ${enemyResult.relationText}`
+      ? `치료 세균이 질병 세균으로 바뀌었어요! ${enemyResult.relationText}`
       : `질병 세균의 공격을 막았어요. ${enemyResult.relationText}`);
     setMoveCount((value) => value + 1);
     if (!enemyResult.board.includes(1)) {
@@ -665,7 +665,7 @@ export default function Home() {
       ? [...next.infected, next.bossIndex]
       : next.infected;
     setInfectionShot(playerTargets.length ? { from: move.to, targets: playerTargets, player: 1 } : null);
-    setFeedback(next.infected.length || next.bossHit ? next.relationText : `감염 조건 불일치. ${next.relationText}`);
+    setFeedback(next.infected.length || next.bossHit ? next.relationText : `숫자 관계가 맞지 않아요. ${next.relationText}`);
     setMoveCount((value) => value + 1);
     if (!next.board.includes(2)) {
       schedule(() => requestCompletion(battleStage), 780);
@@ -719,7 +719,7 @@ export default function Home() {
         setRelationMode(nextMode);
         setFeedback(battleStage.modes.length === 1
           ? `이번 작전은 ${MODE_COPY[nextMode].label}만 사용할 수 있어요.`
-          : `${battle.numbers[index]} 치료 세균을 ${MODE_COPY[nextMode].label}(으)로 바꿨어요. 다시 누르면 다음 모드로 전환됩니다.`);
+          : `${battle.numbers[index]} 치료 세균을 ${MODE_COPY[nextMode].label}(으)로 바꿨어요. 다시 누르면 다음 모드로 바뀝니다.`);
         return;
       }
       setSelectedCell(index);
@@ -774,7 +774,7 @@ export default function Home() {
         : "분열 후 새 수의 배수인지 확인"
     : null;
 
-  if (!hydrated) return <main className="story-app loading-screen"><div className="loader-germ">∴</div><p>치료 세균을 배양하는 중...</p></main>;
+  if (!hydrated) return <main className="story-app loading-screen"><div className="loader-germ">∴</div><p>치료 세균을 만드는 중...</p></main>;
 
   if (view === "title") {
     return <TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} />;
@@ -796,7 +796,7 @@ export default function Home() {
           <button onClick={() => setView("free")}>자유 대전</button>
         </nav>
         <div className="global-progress">
-          <div><span>지구 해방률</span><b>{Math.round((completed.length / STORY_STAGE_COUNT) * 100)}%</b></div>
+          <div><span>지구를 구한 정도</span><b>{Math.round((completed.length / STORY_STAGE_COUNT) * 100)}%</b></div>
           <i><em style={{ width: `${(completed.length / STORY_STAGE_COUNT) * 100}%` }} /></i>
         </div>
       </header>}
@@ -804,17 +804,17 @@ export default function Home() {
       {view === "map" ? (
         <div className="map-layout">
           <section className="mission-brief">
-            <small className="eyebrow">GLOBAL RESPONSE // 2042</small>
-            <h1>숫자 감염으로부터<br /><em>지구를 해방하라</em></h1>
-            <p>약수와 배수의 관계를 활용해 치료 세균을 복제하고, 대륙마다 퍼진 질병 세균을 모두 역감염시키세요.</p>
+            <small className="eyebrow">지구 구출 작전 // 2042</small>
+            <h1>숫자 감염으로부터<br /><em>지구를 구하라</em></h1>
+            <p>약수와 배수의 관계를 이용해 치료 세균을 새로 만들고, 대륙마다 퍼진 질병 세균을 치료 세균으로 바꾸세요.</p>
             <div className="brief-stats">
-              <div><b>{completed.length}</b><span>해방 지역</span></div>
+              <div><b>{completed.length}</b><span>구한 지역</span></div>
               <div><b>{STORY_STAGE_COUNT - completed.length}</b><span>남은 작전</span></div>
               <div><b>{completed.includes(BOSS_STAGE_ID) ? "안정" : "위험"}</b><span>지구 상태</span></div>
             </div>
             <div className="transmission-log">
               <span className="pulse-dot" />
-              <div><small>연구소 통신</small><p>{completed.length === 0 ? "치료 세균 배양 완료. 마닐라의 첫 작전을 승인합니다." : completed.includes(BOSS_STAGE_ID) ? "전 세계 감염 신호 소멸. 지구 생태계가 정상화되었습니다." : `${unlocked}번 감염 지역의 구조 요청을 수신했습니다.`}</p></div>
+              <div><small>연구소 소식</small><p>{completed.length === 0 ? "치료 세균을 모두 만들었어요. 마닐라의 첫 작전을 시작할 수 있습니다." : completed.includes(BOSS_STAGE_ID) ? "전 세계의 감염 신호가 사라졌어요. 지구의 자연이 원래 모습을 되찾았습니다." : `${unlocked}번 감염 지역에서 도와 달라는 연락이 왔습니다.`}</p></div>
             </div>
           </section>
 
@@ -837,7 +837,7 @@ export default function Home() {
           </header>
 
           <section className="petri-status-rail" aria-live="polite">
-            <div className={`petri-turn-beacon p${turn}`}><span>{busy ? "진행" : turn === 1 ? "청록" : "코랄"}</span></div>
+            <div className={`petri-turn-beacon p${turn}`}><span>{busy ? "진행 중" : turn === 1 ? "파란 팀" : "빨간 팀"}</span></div>
             <div className="petri-status-copy">
               <small>턴 {String(moveCount + 1).padStart(2, "0")} · {turn === 1 ? "치료 세균" : "컴퓨터"} · {battleStage.title}</small>
               <strong>{liveComparison ?? feedback}</strong>
@@ -847,7 +847,7 @@ export default function Home() {
 
           <section className="petri-game-layout">
             <aside className={`petri-player-panel cyan ${turn === 1 && !result ? "active" : ""}`}>
-              <div className="petri-player-topline"><span>청록 팀</span><i>● 준비됨</i></div>
+              <div className="petri-player-topline"><span>파란 팀</span><i>● 준비됨</i></div>
               <div className="petri-portrait"><Germ player={1} /><span className="petri-scanline" /></div>
               <div className="petri-identity"><small>내 치료 세균</small><h2>플레이어 1</h2></div>
               <div className="petri-score-block"><small>세균 수</small><strong>{String(therapyCount).padStart(2, "0")}</strong></div>
@@ -886,7 +886,7 @@ export default function Home() {
                       title="선택한 세균을 다시 눌러 다음 모드로 바꿉니다."
                     >
                       <i>{MODE_COPY[relationMode].short}</i>
-                      <span><b>{MODE_COPY[relationMode].label}</b><small>{battleStage.modes.length > 1 ? "다시 눌러 모드 변경" : "이번 작전 전용"}</small></span>
+                      <span><b>{MODE_COPY[relationMode].label}</b><small>{battleStage.modes.length > 1 ? "다시 눌러 모드 바꾸기" : "이번 작전에서만 사용"}</small></span>
                     </button>
                   ) : (
                     <div className="petri-mode-prompt"><i>약</i><span><b>세균을 선택하세요</b><small>같은 세균을 다시 눌러 모드 변경</small></span></div>
@@ -897,14 +897,14 @@ export default function Home() {
             </section>
 
             <aside className={`petri-player-panel coral ${turn === 2 && !result ? "active" : ""}`}>
-              <div className="petri-player-topline"><span>코랄 팀</span><i>● 컴퓨터</i></div>
+              <div className="petri-player-topline"><span>빨간 팀</span><i>● 컴퓨터</i></div>
               <div className="petri-portrait"><Germ player={2} /><span className="petri-scanline" /></div>
-              <div className="petri-identity"><small>{battleStage.boss ? "원천균 지휘망" : "컴퓨터 세균"}</small><h2>{battleStage.boss ? "보스 세균" : "컴퓨터"}</h2></div>
+              <div className="petri-identity"><small>{battleStage.boss ? "우두머리 세균 무리" : "컴퓨터 세균"}</small><h2>{battleStage.boss ? "보스 세균" : "컴퓨터"}</h2></div>
               <div className="petri-score-block"><small>세균 수</small><strong>{String(remainingDisease).padStart(2, "0")}</strong></div>
               <div className="petri-player-metrics">
-                <span><small>역감염</small><b>+{diseaseCaptures}</b></span>
+                <span><small>빼앗김</small><b>+{diseaseCaptures}</b></span>
                 <span><small>난이도</small><b>{battleStage.difficulty === 1 ? "쉬움" : battleStage.difficulty === 2 ? "보통" : "어려움"}</b></span>
-                <span><small>{battleStage.boss ? "내성" : "모드"}</small><b>{battleStage.boss ? `×${battle.bossHp}` : `×${battleStage.modes.length}`}</b></span>
+                <span><small>{battleStage.boss ? "남은 치료" : "모드"}</small><b>{battleStage.boss ? `×${battle.bossHp}` : `×${battleStage.modes.length}`}</b></span>
               </div>
             </aside>
           </section>
@@ -912,7 +912,7 @@ export default function Home() {
           <section className="petri-learning-dock">
             <div><span><i /> {battleStage.lesson}</span><b>{MODE_COPY[relationMode].label}</b></div>
             <p>{battleStage.example}</p>
-            <div className="petri-mission-progress"><span>{remainingDisease === 0 ? `학습 코어 ${learningTasks.length}개` : "남은 질병 세균"}</span><i><em style={{ width: `${Math.max(0, Math.min(100, (therapyCaptures / Math.max(1, battleStage.enemyNumbers.length)) * 100))}%` }} /></i><b>{remainingDisease === 0 ? "대기" : remainingDisease}</b></div>
+            <div className="petri-mission-progress"><span>{remainingDisease === 0 ? `확인 문제 ${learningTasks.length}개` : "남은 질병 세균"}</span><i><em style={{ width: `${Math.max(0, Math.min(100, (therapyCaptures / Math.max(1, battleStage.enemyNumbers.length)) * 100))}%` }} /></i><b>{remainingDisease === 0 ? "준비" : remainingDisease}</b></div>
           </section>
         </div>
       )}
@@ -921,8 +921,8 @@ export default function Home() {
         <div className="result-overlay">
           <section className={`result-card ${result}`}>
             <span className="result-symbol">{result === "clear" ? "✓" : "!"}</span>
-            <small>{result === "clear" ? "REGION LIBERATED" : "TREATMENT FAILED"}</small>
-            <h2>{result === "clear" ? `${battleStage.place} 해방 완료` : "치료 세균이 모두 감염됐어요"}</h2>
+            <small>{result === "clear" ? "지역 구하기 성공" : "치료 작전 실패"}</small>
+            <h2>{result === "clear" ? `${battleStage.place} 구하기 완료` : "치료 세균이 모두 감염됐어요"}</h2>
             <p>{result === "clear" ? `${battleStage.lesson}의 핵심 개념으로 질병 세균을 모두 제거했습니다.` : "숫자 관계와 모드를 다시 확인하고 재도전하세요."}</p>
             <div>
               <button onClick={() => beginBattle(battleStage, freeBattle)}>다시 하기</button>

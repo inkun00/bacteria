@@ -286,16 +286,16 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       setWinner(result);
       setGameOver(true);
       setThinking(false);
-      setNotice(result === 0 ? "세균 수가 같아요 — 무승부" : `${result === 1 ? "청록" : "코랄"} 팀이 게임판을 더 많이 차지했어요`);
+      setNotice(result === 0 ? "세균 수가 같아요 — 무승부" : `${result === 1 ? "파란" : "빨간"} 팀이 게임판을 더 많이 차지했어요`);
       window.setTimeout(() => playTone("win"), 140);
       return;
     }
     if (!nextMoves.length) {
       setCurrentPlayer(lastPlayer);
-      setNotice(`${nextPlayer === 1 ? "청록" : "코랄"} 팀은 움직일 수 없어 차례를 넘겨요`);
+      setNotice(`${nextPlayer === 1 ? "파란" : "빨간"} 팀은 움직일 수 없어 차례를 넘겨요`);
     } else {
       setCurrentPlayer(nextPlayer);
-      setNotice(nextPlayer === 1 ? "청록 팀 차례예요" : settings.mode === "ai" ? "컴퓨터가 다음 수를 생각하고 있어요" : "코랄 팀 차례예요");
+      setNotice(nextPlayer === 1 ? "파란 팀 차례예요" : settings.mode === "ai" ? "컴퓨터가 다음 수를 생각하고 있어요" : "빨간 팀 차례예요");
     }
   }, [playTone, settings.mode]);
 
@@ -353,7 +353,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       : activeModeLabel;
     const spawnLabel = move.distance === 1
       ? mode === "split"
-        ? `${result.attackerNumber} = ${result.parentNumber} × ${result.spawnedNumber} · 부모와 새 세균의 수가 나뉘었어요`
+        ? `${result.attackerNumber} = ${result.parentNumber} × ${result.spawnedNumber} · 원래 세균과 새 세균의 수로 나뉘었어요`
         : mode === "divisor" && result.spawnedNumber === result.attackerNumber
         ? `${result.attackerNumber}은(는) 1 말고 다른 약수가 없어 같은 수로 새 세균을 만들었어요`
         : `${result.attackerNumber}의 ${activeModeLabel}인 ${result.spawnedNumber}번 새 세균을 만들었어요`
@@ -368,7 +368,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         setResisted(result.resisted);
         setNotice(bombUsed
           ? `세균탄으로 주변 상대 세균 ${result.infected.length}개를 감염시켜요`
-          : `숫자 조건이 맞는 세균 ${result.infected.length}개에 감염탄을 쏴요`);
+          : `숫자 관계가 맞는 상대 세균 ${result.infected.length}개를 내 편으로 만들어요`);
       }, 260);
       schedule(() => {
         setBoard(result.board);
@@ -531,7 +531,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         const nextRelationMode = nextMode(relationMode);
         setRelationMode(nextRelationMode);
         setNotice(nextRelationMode === "split" && !factorPairs(numbers[index] ?? 0).length
-          ? `${numbers[index]}은(는) 소수이므로 더 분열할 수 없습니다`
+          ? `${numbers[index]}은(는) 1과 자기 자신으로만 나누어져 더 나눌 수 없어요`
           : `${numbers[index]}번 세균을 ${modeLabel(nextRelationMode)} 모드로 바꿨어요`);
       } else {
         setSelected(index);
@@ -603,7 +603,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       </header>
 
       <section className="status-rail" aria-live="polite">
-        <div className={`turn-beacon p${currentPlayer}`}><span>{thinking ? "생각 중" : currentPlayer === 1 ? "청록" : "코랄"}</span></div>
+        <div className={`turn-beacon p${currentPlayer}`}><span>{thinking ? "생각 중" : currentPlayer === 1 ? "파란 팀" : "빨간 팀"}</span></div>
         <div className="status-copy">
           <small>턴 {String(moveNumber).padStart(2, "0")} · {activeName}</small>
           <strong>{notice}</strong>
@@ -617,7 +617,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
 
       <section className="game-layout">
         <aside className={`player-panel cyan ${currentPlayer === 1 && !gameOver ? "active" : ""}`}>
-          <div className="player-topline"><span>청록 팀</span><i>● 준비됨</i></div>
+          <div className="player-topline"><span>파란 팀</span><i>● 준비됨</i></div>
           <div className="portrait"><Germ player={1} /><span className="scanline" /></div>
           <div className="identity"><small>내 세균</small><h2>플레이어 1</h2></div>
           <div className="score-block"><small>세균 수</small><strong>{String(scores[0]).padStart(2, "0")}</strong></div>
@@ -658,7 +658,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                       onMouseEnter={() => move && setHovered(index)}
                       onMouseLeave={() => setHovered(null)}
                       role="gridcell"
-                      aria-label={`${row}행 ${col}열, ${cell === 0 ? move ? move.distance === 1 ? "새 세균 만들기 가능" : "두 칸 이동 가능" : "빈 칸" : `${cell === 1 ? "청록" : "코랄"} ${numbers[index]}번 세균`}`}
+                      aria-label={`${row}행 ${col}열, ${cell === 0 ? move ? move.distance === 1 ? "새 세균 만들기 가능" : "두 칸 이동 가능" : "빈 칸" : `${cell === 1 ? "파란" : "빨간"} 팀 ${numbers[index]}번 세균`}`}
                     >
                       <span className="cell-gridmark" />
                       {cell !== 0 && (
@@ -740,7 +740,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         </section>
 
         <aside className={`player-panel coral ${currentPlayer === 2 && !gameOver ? "active" : ""}`}>
-          <div className="player-topline"><span>코랄 팀</span><i>● {settings.mode === "ai" ? "컴퓨터" : "준비됨"}</i></div>
+          <div className="player-topline"><span>빨간 팀</span><i>● {settings.mode === "ai" ? "컴퓨터" : "준비됨"}</i></div>
           <div className="portrait"><Germ player={2} /><span className="scanline" /></div>
           <div className="identity"><small>{settings.mode === "ai" ? "컴퓨터 세균" : "상대 세균"}</small><h2>{playerTwoName}</h2></div>
           <div className="score-block"><small>세균 수</small><strong>{String(scores[1]).padStart(2, "0")}</strong></div>
@@ -759,16 +759,16 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             <em style={{ width: `${(displayedCharge[0] / 5) * 100}%` }} />
             {[1, 2, 3, 4].map((tick) => <i key={tick} style={{ left: `${tick * 20}%` }} />)}
           </div>
-          <small>{chargeBurst === 1 ? "충전 완료 · +1" : `${bombCharge[0]} / 5 개인 턴`}</small>
+          <small>{chargeBurst === 1 ? "세균탄 받음 · +1" : `${bombCharge[0]} / 5 내 차례`}</small>
         </div>
-        <div className="charge-core"><span>✹</span><b>자동 충전</b><small>5턴마다 세균탄 +1</small></div>
+        <div className="charge-core"><span>✹</span><b>자동으로 모으기</b><small>5번 움직일 때마다 세균탄 +1</small></div>
         <div className={`charge-unit p2 ${currentPlayer === 2 && !gameOver ? "active" : ""} ${chargeBurst === 2 ? "charged" : ""}`}>
           <div className="charge-heading"><span><i /> {playerTwoName}</span><b>세균탄 ×{bombs[1]}</b></div>
           <div className="charge-track" role="progressbar" aria-label="플레이어 2 세균탄 모으기" aria-valuemin={0} aria-valuemax={5} aria-valuenow={displayedCharge[1]}>
             <em style={{ width: `${(displayedCharge[1] / 5) * 100}%` }} />
             {[1, 2, 3, 4].map((tick) => <i key={tick} style={{ left: `${tick * 20}%` }} />)}
           </div>
-          <small>{chargeBurst === 2 ? "충전 완료 · +1" : `${bombCharge[1]} / 5 개인 턴`}</small>
+          <small>{chargeBurst === 2 ? "세균탄 받음 · +1" : `${bombCharge[1]} / 5 내 차례`}</small>
         </div>
       </section>
 
@@ -806,7 +806,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                     onClick={() => setDraftSettings((value) => ({ ...value, boardSize: size }))}
                   >
                     <b>{size} × {size}</b>
-                    <small>{size === 7 ? "빠른 대전" : size === 9 ? "표준 대전" : "대형 대전"}</small>
+                    <small>{size === 7 ? "빠른 게임" : size === 9 ? "보통 크기" : "큰 게임"}</small>
                   </button>
                 ))}
               </div>
@@ -840,10 +840,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             <p className="rules-lead">약수와 배수를 찾아 상대 세균을 내 편으로 만드세요.</p>
             <ol>
               <li><b>게임판 크기</b><p>게임을 시작할 때 7×7, 9×9, 11×11 중 하나를 고를 수 있어요. 크기가 달라도 게임 방법은 같아요.</p></li>
-              <li><b>나오는 숫자</b><p>시작 세균, 배수로 만든 새 세균, 감염된 세균에는 2부터 100까지의 합성수가 나와요. 합성수는 1과 자기 자신 말고도 약수가 있는 수예요. 약수 모드와 분열 모드에서는 소수도 나올 수 있어요.</p></li>
-              <li><b>구구단 숫자가 나올 확률</b><p>시작 세균과 감염된 세균의 숫자는 90% 확률로 2단부터 9단까지의 구구단 숫자에서 나와요. 나머지 10%는 2부터 100까지의 다른 합성수에서 나와요.</p></li>
-              <li><b>새 세균의 숫자</b><p>약수 모드에서는 고른 세균의 약수 가운데 하나가 나와요. 1과 고른 세균의 수는 빼고 아무거나 하나를 고르며, 소수도 나올 수 있어요. 고를 약수가 없을 때만 같은 수가 나와요. 배수 모드에서는 100 이하인 배수 가운데 하나가 나와요.</p></li>
-              <li><b>감염된 세균의 숫자</b><p>내 편이 된 상대 세균은 새로운 합성수를 받아요. 이때도 구구단 숫자가 먼저 나와요.</p></li>
+              <li><b>나오는 숫자</b><p>시작 세균과 새 세균에는 2부터 100까지의 수가 나와요. 대부분 1과 자기 자신 말고도 나누어지는 수이며, 약수 모드와 분열 모드에서는 1과 자기 자신으로만 나누어지는 수도 나올 수 있어요.</p></li>
+              <li><b>구구단 숫자가 나오는 정도</b><p>시작 세균과 감염된 세균은 10번 중 약 9번, 2단부터 9단까지의 구구단에 나오는 수를 받아요. 가끔은 2부터 100까지의 다른 수가 나와요.</p></li>
+              <li><b>새 세균의 숫자</b><p>약수 모드에서는 고른 세균의 약수 가운데 하나가 나와요. 1과 고른 세균의 수는 빼고 아무거나 하나를 고릅니다. 고를 약수가 없을 때만 같은 수가 나와요. 배수 모드에서는 100 이하인 배수 가운데 하나가 나와요.</p></li>
+              <li><b>감염된 세균의 숫자</b><p>내 편이 된 상대 세균은 2부터 100까지의 새로운 수를 받아요. 이때도 구구단에 나오는 수가 먼저 나와요.</p></li>
               <li><b>모드 바꾸기</b><p>내 세균을 한 번 누르면 선택돼요. 같은 세균을 다시 누를 때마다 약수 → 배수 → 분열 순서로 바뀌어요.</p></li>
               <li><b>약수 모드</b><p>상대 세균의 숫자가 내가 고른 세균 숫자의 약수이면 감염돼요. 예를 들어 고른 세균이 6이고 상대가 3이면 성공이에요.</p></li>
               <li><b>배수 모드</b><p>상대 세균의 숫자가 내가 고른 세균 숫자의 배수이면 감염돼요. 예를 들어 고른 세균이 3이고 상대가 6이면 성공이에요.</p></li>
@@ -882,7 +882,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
           <section className={`result-card ${winner === 2 ? "coral-win" : ""}`}>
             <span className="result-kicker">게임 끝</span>
             {winner !== 0 ? <Germ player={winner} /> : <div className="draw-symbol">＝</div>}
-            <h2>{winner === 0 ? "무승부" : `${winner === 1 ? "청록" : "코랄"} 팀 승리`}</h2>
+            <h2>{winner === 0 ? "무승부" : `${winner === 1 ? "파란" : "빨간"} 팀 승리`}</h2>
             <p>{scores[0]} <i>:</i> {scores[1]}</p>
             <small>{moveNumber - 1}번 움직임 · {formatTime(elapsed)}</small>
             <div><button onClick={() => startGame(settings)}>다시 하기</button><button onClick={() => setSetupOpen(true)}>설정 바꾸기</button></div>
@@ -892,4 +892,3 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     </main>
   );
 }
-
