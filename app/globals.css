@@ -656,6 +656,12 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .learning-gate-copy > span { color: #72998f; font-size: 10px; }
 .learning-gate-copy h3 { margin: 8px 0 0; color: #f0faf7; font-size: clamp(17px,2.6vw,23px); line-height: 1.38; }
 .learning-gate-copy p { margin: 8px 0 0; color: #94aaa4; font-size: 10px; }
+.learning-short-answer { margin-top: 14px; padding: 15px; border: 1px solid rgba(46,229,208,.24); border-radius: 11px; background: rgba(5,29,24,.78); }
+.learning-short-answer label { display: block; margin-bottom: 8px; color: #86afa4; font: 800 9px/1 "IBM Plex Mono",monospace; letter-spacing: .1em; }
+.learning-short-answer input { width: 100%; height: 50px; padding: 0 15px; border: 1px solid rgba(46,229,208,.38); border-radius: 9px; outline: 0; color: #eafff9; -webkit-text-fill-color: currentColor; caret-color: #35ead3; background: #071f1a; font: 900 18px/1 "IBM Plex Mono",monospace; }
+.learning-short-answer input::placeholder { color: #53746b; -webkit-text-fill-color: #53746b; font-size: 11px; font-weight: 600; }
+.learning-short-answer input:focus { border-color: #35ead3; box-shadow: 0 0 0 3px rgba(53,234,211,.1); }
+.learning-short-answer input:disabled { color: #b9eee3; opacity: 1; }
 .learning-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 14px; }
 .learning-options button { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 10px 13px; text-align: left; color: #b8cec8; border: 1px solid rgba(126,174,161,.2); border-radius: 10px; background: rgba(8,38,31,.72); transition: .16s ease; }
 .learning-options button:hover:not(:disabled) { border-color: rgba(46,229,208,.48); transform: translateY(-1px); }

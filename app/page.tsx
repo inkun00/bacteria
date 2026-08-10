@@ -314,10 +314,27 @@ function LearningGate({
           <span>{task.context}</span>
           <h3>{task.prompt}</h3>
           {task.multiple && <p>정답을 모두 선택한 뒤 치료 신호를 전송하세요.</p>}
+          {task.shortAnswer && <p>계산한 답을 직접 입력한 뒤 치료 신호를 전송하세요.</p>}
         </div>
 
-        <div className={`learning-options ${task.multiple ? "multiple" : ""}`}>
-          {task.options.map((option) => {
+        {task.shortAnswer ? (
+          <div className="learning-short-answer">
+            <label htmlFor={`learning-answer-${task.id}`}>단답형 정답</label>
+            <input
+              id={`learning-answer-${task.id}`}
+              inputMode="numeric"
+              autoComplete="off"
+              value={state.selected[0] ?? ""}
+              placeholder={task.placeholder ?? "숫자로 입력하세요"}
+              disabled={state.status === "correct"}
+              onChange={(event) => onToggle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && state.selected[0]?.trim()) onSubmit();
+              }}
+            />
+          </div>
+        ) : <div className={`learning-options ${task.multiple ? "multiple" : ""}`}>
+          {(task.options ?? []).map((option) => {
             const selected = state.selected.includes(option);
             return (
               <button
@@ -333,7 +350,7 @@ function LearningGate({
               </button>
             );
           })}
-        </div>
+        </div>}
 
         {state.status === "wrong" && <div className="learning-feedback wrong"><b>방어막 유지</b><span>선택을 다시 살펴보세요. 나눗셈이나 곱셈 관계를 확인하면 됩니다.</span></div>}
         {state.status === "correct" && <div className="learning-feedback correct"><b>코어 해제 성공</b><span>{task.explanation}</span></div>}
@@ -344,7 +361,7 @@ function LearningGate({
               {state.taskIndex + 1 === total ? isBoss ? "최종 치료 파장 발사" : "지역 해방 완료" : "다음 코어 분석"} →
             </button>
           ) : (
-            <button className="primary" type="button" disabled={!state.selected.length} onClick={onSubmit}>치료 신호 전송</button>
+            <button className="primary" type="button" disabled={!state.selected.some((value) => value.trim())} onClick={onSubmit}>치료 신호 전송</button>
           )}
         </div>
       </section>

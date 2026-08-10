@@ -19,9 +19,11 @@ export type LearningTask = {
   id: string;
   prompt: string;
   context: string;
-  options: string[];
+  options?: string[];
   answers: string[];
   multiple?: boolean;
+  shortAnswer?: boolean;
+  placeholder?: string;
   explanation: string;
 };
 
@@ -255,6 +257,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       answers: ["12 ÷ 5의 나머지가 0이 아니기 때문"],
       explanation: "어떤 수로 나누었을 때 나머지가 0이어야 그 수의 약수입니다.",
     },
+    {
+      id: "divisor-count-7",
+      prompt: "7의 약수는 모두 몇 개일까요?",
+      context: "7을 나누어떨어지게 하는 자연수를 빠짐없이 생각하세요.",
+      answers: ["2", "2개"],
+      shortAnswer: true,
+      explanation: "7의 약수는 1과 7이므로 모두 2개입니다.",
+    },
+    {
+      id: "missing-divisor-18",
+      prompt: "18 ÷ □ = 3입니다. □에 들어갈 수를 쓰세요.",
+      context: "나눗셈식을 이용해 18의 약수를 찾으세요.",
+      answers: ["6"],
+      shortAnswer: true,
+      explanation: "18÷6=3이므로 □는 6이고, 6은 18의 약수입니다.",
+    },
   ],
   2: [
     {
@@ -272,6 +290,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       options: ["4와 6은 24의 약수이고, 24는 4와 6의 배수", "24는 4의 약수", "6은 24의 배수"],
       answers: ["4와 6은 24의 약수이고, 24는 4와 6의 배수"],
       explanation: "곱해서 24를 만드는 4와 6은 24의 약수이고, 24는 두 수의 배수입니다.",
+    },
+    {
+      id: "fifth-multiple-6",
+      prompt: "6의 다섯 번째 배수를 쓰세요.",
+      context: "6×1부터 차례로 세어 다섯 번째 값을 찾으세요.",
+      answers: ["30"],
+      shortAnswer: true,
+      explanation: "6×5=30이므로 6의 다섯 번째 배수는 30입니다.",
+    },
+    {
+      id: "multiple-product-8",
+      prompt: "8의 일곱 번째 배수를 쓰세요.",
+      context: "8에 7을 곱해 배수를 만드세요.",
+      answers: ["56"],
+      shortAnswer: true,
+      explanation: "8×7=56이므로 56은 8의 일곱 번째 배수입니다.",
     },
   ],
   3: [
@@ -292,6 +326,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       answers: ["6"],
       explanation: "공약수 1, 2, 3, 6 중 가장 큰 수는 6입니다.",
     },
+    {
+      id: "gcd-16-24",
+      prompt: "16과 24의 최대공약수를 쓰세요.",
+      context: "두 수의 공약수 중 가장 큰 수를 찾으세요.",
+      answers: ["8"],
+      shortAnswer: true,
+      explanation: "16과 24의 공약수는 1, 2, 4, 8이고 최대공약수는 8입니다.",
+    },
+    {
+      id: "common-divisor-count",
+      prompt: "최대공약수가 6일 때, 두 수의 공약수는 모두 몇 개일까요?",
+      context: "두 수의 공약수는 최대공약수의 약수와 같습니다.",
+      answers: ["4", "4개"],
+      shortAnswer: true,
+      explanation: "6의 약수는 1, 2, 3, 6이므로 공약수는 모두 4개입니다.",
+    },
   ],
   4: [
     {
@@ -309,6 +359,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       options: ["2", "3", "5", "6"],
       answers: ["6"],
       explanation: "공통으로 나눈 수 2와 3을 곱한 6이 18과 24의 최대공약수입니다.",
+    },
+    {
+      id: "gcd-36-48",
+      prompt: "36과 48의 최대공약수를 쓰세요.",
+      context: "두 수를 공약수로 계속 나누거나 공약수를 비교하세요.",
+      answers: ["12"],
+      shortAnswer: true,
+      explanation: "36과 48을 모두 나누는 가장 큰 수는 12입니다.",
+    },
+    {
+      id: "gcd-flower-bags",
+      prompt: "장미 24송이와 튤립 60송이를 남김없이 똑같이 나누어 최대한 많은 꽃병에 담으려 합니다. 꽃병은 몇 개 필요할까요?",
+      context: "두 수의 최대공약수를 생활 문제에 적용하세요.",
+      answers: ["12", "12개"],
+      shortAnswer: true,
+      explanation: "24와 60의 최대공약수는 12이므로 꽃병은 최대 12개입니다.",
     },
   ],
   5: [
@@ -329,6 +395,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       answers: ["15"],
       explanation: "공배수 15, 30, 45, … 중 가장 작은 수는 15입니다.",
     },
+    {
+      id: "lcm-4-6-concept",
+      prompt: "4와 6의 최소공배수를 쓰세요.",
+      context: "4의 배수와 6의 배수가 처음 만나는 수를 찾으세요.",
+      answers: ["12"],
+      shortAnswer: true,
+      explanation: "4의 배수 4, 8, 12와 6의 배수 6, 12가 처음 만나는 수는 12입니다.",
+    },
+    {
+      id: "first-common-multiple-2-3",
+      prompt: "2와 3의 공배수 중 가장 작은 수를 쓰세요.",
+      context: "두 수의 배수 목록을 비교하세요.",
+      answers: ["6"],
+      shortAnswer: true,
+      explanation: "6은 2와 3의 첫 번째 공배수이므로 최소공배수입니다.",
+    },
   ],
   6: [
     {
@@ -346,6 +428,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       options: ["40", "60", "80", "120"],
       answers: ["60"],
       explanation: "60은 12×5이면서 20×3이고, 가장 작은 공배수입니다.",
+    },
+    {
+      id: "lcm-30-45",
+      prompt: "30과 45의 최소공배수를 쓰세요.",
+      context: "공약수로 나눈 수와 남은 몫을 모두 곱해 계산하세요.",
+      answers: ["90"],
+      shortAnswer: true,
+      explanation: "30과 45의 최소공배수는 90입니다.",
+    },
+    {
+      id: "lighthouse-cycle",
+      prompt: "12초마다 켜지는 등대와 20초마다 켜지는 등대가 지금 함께 켜졌습니다. 다시 함께 켜지는 것은 몇 초 뒤일까요?",
+      context: "두 점등 주기의 최소공배수를 구하세요.",
+      answers: ["60", "60초"],
+      shortAnswer: true,
+      explanation: "12와 20의 최소공배수는 60이므로 60초 뒤에 다시 함께 켜집니다.",
     },
   ],
   7: [
@@ -366,6 +464,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       answers: ["3 → 12 → 4 → 20"],
       explanation: "3→12는 배수, 12→4는 약수, 4→20은 배수 관계이고 같은 수를 반복하지 않았습니다.",
     },
+    {
+      id: "relay-multiple-count",
+      prompt: "이어달리기에서 4 다음에 20을 썼습니다. 20은 4의 몇 배일까요?",
+      context: "앞 수와 다음 수의 배수 관계를 계산하세요.",
+      answers: ["5", "5배"],
+      shortAnswer: true,
+      explanation: "4×5=20이므로 20은 4의 5배입니다.",
+    },
+    {
+      id: "relay-next-prime",
+      prompt: "7 다음에 이어 쓸 수 있는 7보다 큰 가장 작은 수를 쓰세요.",
+      context: "7의 약수 또는 배수이면서 아직 사용하지 않은 수를 찾으세요.",
+      answers: ["14"],
+      shortAnswer: true,
+      explanation: "7보다 큰 7의 가장 작은 배수는 14이므로 이어 쓸 수 있습니다.",
+    },
   ],
   8: [
     {
@@ -383,6 +497,22 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       options: ["7시 24분", "7시 30분", "7시 36분", "7시 48분"],
       answers: ["7시 36분"],
       explanation: "12와 18의 최소공배수는 36이므로 36분 뒤인 7시 36분에 다시 만납니다.",
+    },
+    {
+      id: "bus-cycle-8-12",
+      prompt: "8분마다 오는 버스와 12분마다 오는 버스가 지금 함께 도착했습니다. 다시 함께 도착하는 것은 몇 분 뒤일까요?",
+      context: "두 운행 간격의 최소공배수를 구하세요.",
+      answers: ["24", "24분"],
+      shortAnswer: true,
+      explanation: "8과 12의 최소공배수는 24이므로 24분 뒤에 다시 도착합니다.",
+    },
+    {
+      id: "train-cycle-14-5",
+      prompt: "14분 간격 열차와 5분 간격 열차가 함께 출발했습니다. 다시 함께 출발하는 것은 몇 분 뒤일까요?",
+      context: "서로 공약수가 1인 두 수의 최소공배수를 구하세요.",
+      answers: ["70", "70분"],
+      shortAnswer: true,
+      explanation: "14와 5의 최소공배수는 70이므로 70분 뒤에 다시 함께 출발합니다.",
     },
   ],
   9: [
@@ -418,6 +548,38 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       options: ["8일", "10일", "12일", "24일"],
       answers: ["12일"],
       explanation: "4와 6의 최소공배수는 12이므로 12일 뒤에 다시 겹칩니다.",
+    },
+    {
+      id: "review-gcd-short",
+      prompt: "40과 64의 최대공약수를 쓰세요.",
+      context: "단원 확인 · 최대공약수 계산",
+      answers: ["8"],
+      shortAnswer: true,
+      explanation: "40과 64를 모두 나누는 가장 큰 수는 8입니다.",
+    },
+    {
+      id: "review-lcm-short",
+      prompt: "16과 24의 최소공배수를 쓰세요.",
+      context: "단원 확인 · 최소공배수 계산",
+      answers: ["48"],
+      shortAnswer: true,
+      explanation: "48은 16×3이면서 24×2인 가장 작은 공배수입니다.",
+    },
+    {
+      id: "review-sharing-short",
+      prompt: "색종이 40장과 도화지 64장을 남김없이 똑같이 나누어 최대한 많은 꾸러미를 만들면 몇 꾸러미일까요?",
+      context: "단원 확인 · 최대공약수 생활 문제",
+      answers: ["8", "8꾸러미", "8개"],
+      shortAnswer: true,
+      explanation: "40과 64의 최대공약수가 8이므로 최대 8꾸러미를 만들 수 있습니다.",
+    },
+    {
+      id: "review-cycle-short",
+      prompt: "10일마다와 15일마다 하는 활동이 오늘 겹쳤습니다. 다시 겹치는 것은 며칠 뒤일까요?",
+      context: "단원 확인 · 최소공배수 생활 문제",
+      answers: ["30", "30일"],
+      shortAnswer: true,
+      explanation: "10과 15의 최소공배수는 30이므로 30일 뒤에 다시 겹칩니다.",
     },
   ],
   10: [
@@ -463,10 +625,46 @@ export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
       answers: ["60분"],
       explanation: "15와 20의 최소공배수는 60이므로 60분 뒤에 다시 겹칩니다.",
     },
+    {
+      id: "boss-divisor-count-short",
+      prompt: "24의 약수는 모두 몇 개일까요?",
+      context: "제6 내성 · 약수 완전 탐색",
+      answers: ["8", "8개"],
+      shortAnswer: true,
+      explanation: "24의 약수는 1, 2, 3, 4, 6, 8, 12, 24로 모두 8개입니다.",
+    },
+    {
+      id: "boss-multiple-short",
+      prompt: "7의 다섯 번째 배수를 쓰세요.",
+      context: "제7 내성 · 배수 생성",
+      answers: ["35"],
+      shortAnswer: true,
+      explanation: "7×5=35이므로 7의 다섯 번째 배수는 35입니다.",
+    },
+    {
+      id: "boss-gcd-short",
+      prompt: "30과 45의 최대공약수를 쓰세요.",
+      context: "제8 내성 · 최대공약수 계산",
+      answers: ["15"],
+      shortAnswer: true,
+      explanation: "30과 45를 모두 나누는 가장 큰 수는 15입니다.",
+    },
+    {
+      id: "boss-lcm-short",
+      prompt: "18과 24의 최소공배수를 쓰세요.",
+      context: "최종 내성 · 최소공배수 계산",
+      answers: ["72"],
+      shortAnswer: true,
+      explanation: "72는 18×4이면서 24×3인 가장 작은 공배수입니다.",
+    },
   ],
 };
 
 export function isLearningAnswerCorrect(task: LearningTask, selected: string[]) {
+  if (task.shortAnswer) {
+    const normalized = selected[0]?.trim().replace(/\s+/g, "").replace(/，/g, ",") ?? "";
+    return task.answers.some((answer) => answer.trim().replace(/\s+/g, "").replace(/，/g, ",") === normalized);
+  }
   if (selected.length !== task.answers.length) return false;
   const answerSet = new Set(task.answers);
   return selected.every((answer) => answerSet.has(answer));
