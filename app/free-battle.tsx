@@ -164,6 +164,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [notice, setNotice] = useState("내 세균을 고른 뒤 약수·배수·분열 중 하나를 선택하세요");
   const audioRef = useRef<AudioContext | null>(null);
   const sequenceTimers = useRef<number[]>([]);
+  const animationWatchdog = useRef<number | null>(null);
 
   useEffect(() => {
     try {
@@ -210,6 +211,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const clearSequenceTimers = useCallback(() => {
     sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
     sequenceTimers.current = [];
+    if (animationWatchdog.current !== null) {
+      window.clearTimeout(animationWatchdog.current);
+      animationWatchdog.current = null;
+    }
   }, []);
 
   const schedule = useCallback((callback: () => void, delay: number) => {
@@ -258,22 +263,28 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
 
   const playTone = useCallback((kind: "move" | "infect" | "win" | "select") => {
     if (!soundOn || typeof window === "undefined") return;
-    const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtor) return;
-    const context = audioRef.current ?? new AudioCtor();
-    audioRef.current = context;
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    const frequencies = { select: 420, move: 280, infect: 160, win: 620 };
-    oscillator.type = kind === "infect" ? "sawtooth" : "sine";
-    oscillator.frequency.setValueAtTime(frequencies[kind], context.currentTime);
-    if (kind === "win") oscillator.frequency.exponentialRampToValueAtTime(980, context.currentTime + 0.22);
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.09, context.currentTime + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + (kind === "win" ? 0.32 : 0.16));
-    oscillator.connect(gain).connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + (kind === "win" ? 0.34 : 0.18));
+    try {
+      const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtor) return;
+      const previous = audioRef.current;
+      const context = previous && previous.state !== "closed" ? previous : new AudioCtor();
+      audioRef.current = context;
+      if (context.state === "suspended") void context.resume().catch(() => undefined);
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const frequencies = { select: 420, move: 280, infect: 160, win: 620 };
+      oscillator.type = kind === "infect" ? "sawtooth" : "sine";
+      oscillator.frequency.setValueAtTime(frequencies[kind], context.currentTime);
+      if (kind === "win") oscillator.frequency.exponentialRampToValueAtTime(980, context.currentTime + 0.22);
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.09, context.currentTime + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + (kind === "win" ? 0.32 : 0.16));
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + (kind === "win" ? 0.34 : 0.18));
+    } catch {
+      audioRef.current = null;
+    }
   }, [soundOn]);
 
   const resolveEnd = useCallback((nextBoard: Cell[], lastPlayer: Player, nextPlayer: Player) => {
@@ -314,6 +325,37 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       relationMode,
     }]);
     const result = applyMove(board, numbers, player, move, mode, { forceInfection: useBomb });
+    let infectionCommitted = false;
+    const commitInfection = () => {
+      if (!result.infected.length || infectionCommitted) return;
+      infectionCommitted = true;
+      setBoard(result.board);
+      setNumbers(result.numbers);
+      setInfection({ cells: result.infected, player });
+      setCaptures((value) => {
+        const next: [number, number] = [...value] as [number, number];
+        next[player - 1] += result.infected.length;
+        return next;
+      });
+    };
+    const opponent: Player = player === 1 ? 2 : 1;
+    const finishSequence = () => {
+      if (animationWatchdog.current !== null) {
+        window.clearTimeout(animationWatchdog.current);
+        animationWatchdog.current = null;
+      }
+      commitInfection();
+      setBoard(result.board);
+      setNumbers(result.numbers);
+      setInfection(null);
+      setProjectiles([]);
+      setResisted([]);
+      setArrived(null);
+      setAnimating(false);
+      setThinking(false);
+      resolveEnd(result.board, player, opponent);
+    };
+    animationWatchdog.current = window.setTimeout(finishSequence, 3500);
     const bombUsed = useBomb && result.infected.length > 0;
     const chargeCompleted = bombCharge[player - 1] >= 4;
     setBombCharge((value) => {
@@ -333,7 +375,6 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       });
     }
     setBombArmed(false);
-    const opponent: Player = player === 1 ? 2 : 1;
     const movedBoard = [...result.board];
     const movedNumbers = [...result.numbers];
     result.infected.forEach((index) => { movedBoard[index] = opponent; });
@@ -371,24 +412,11 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
           : `숫자 관계가 맞는 상대 세균 ${result.infected.length}개를 내 편으로 만들어요`);
       }, 260);
       schedule(() => {
-        setBoard(result.board);
-        setNumbers(result.numbers);
-        setInfection({ cells: result.infected, player });
-        setCaptures((value) => {
-          const next: [number, number] = [...value] as [number, number];
-          next[player - 1] += result.infected.length;
-          return next;
-        });
+        commitInfection();
         setNotice(`상대 세균 ${result.infected.length}개가 내 편이 되었어요${chargeLabel}`);
         playTone("infect");
       }, 820);
-      schedule(() => {
-        setInfection(null);
-        setProjectiles([]);
-        setResisted([]);
-        setAnimating(false);
-        resolveEnd(result.board, player, opponent);
-      }, 1580);
+      schedule(finishSequence, 1580);
     } else {
       setResisted(result.resisted);
       const resultNotice = useBomb && !bombUsed
@@ -397,11 +425,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         ? `${spawnLabel} · 주변 숫자에 ${infectionRuleLabel}가 없어 감염되지 않았어요`
         : `${spawnLabel} · 바로 옆에 상대 세균이 없어요`;
       setNotice(`${resultNotice}${chargeLabel}`);
-      schedule(() => {
-        setResisted([]);
-        setAnimating(false);
-        resolveEnd(result.board, player, opponent);
-      }, result.resisted.length ? 1050 : 560);
+      schedule(finishSequence, result.resisted.length ? 1050 : 560);
     }
   }, [animating, board, bombCharge, bombs, captures, clearSequenceTimers, currentPlayer, gameOver, moveNumber, numbers, playTone, relationMode, resolveEnd, restartPromptOpen, schedule]);
 
@@ -413,7 +437,11 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     setThinking(true);
     setNotice("컴퓨터가 게임판을 살펴보고 있어요");
     const action = chooseAiAction(board, numbers, settings.difficulty, 2, bombs[1]);
-    if (!action) return;
+    if (!action) {
+      setThinking(false);
+      resolveEnd(board, 2, 1);
+      return;
+    }
     const pacing = settings.difficulty === "hard" ? 160 : 0;
     const selectTimer = window.setTimeout(() => {
       setSelected(action.move.from);
@@ -441,7 +469,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       window.clearTimeout(targetTimer);
       window.clearTimeout(moveTimer);
     };
-  }, [animating, board, bombs, currentPlayer, executeMove, gameOver, numbers, playTone, restartPromptOpen, settings, setupOpen]);
+  }, [animating, board, bombs, currentPlayer, executeMove, gameOver, numbers, playTone, resolveEnd, restartPromptOpen, settings, setupOpen]);
 
   useEffect(() => () => clearSequenceTimers(), [clearSequenceTimers]);
 

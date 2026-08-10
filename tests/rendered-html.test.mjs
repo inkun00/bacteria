@@ -112,6 +112,9 @@ test("ships the title mode selector and restored classic free battle", async () 
   assert.match(freeBattle, /되돌리기/);
   assert.match(freeBattle, /chooseAiAction/);
   assert.match(freeBattle, /nextMode\(relationMode\)/);
+  assert.match(freeBattle, /animationWatchdog/);
+  assert.match(freeBattle, /context\.resume\(\)\.catch/);
+  assert.match(freeBattle, /if \(!action\) \{\s*setThinking\(false\);\s*resolveEnd\(board, 2, 1\);/);
   assert.match(game, /export function applyMove/);
   assert.match(freeStyles, /\.free-battle \.setup-modal/);
   assert.match(freeStyles, /@keyframes infectionShot/);
