@@ -280,7 +280,14 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .location-line { margin: 22px 0; color: #adc0cd; font-size: 11px; }
 .location-line i { color: var(--coral); font-style: normal; }
 .location-line span { float: right; color: #5f7d92; }
-.stage-story { color: #9bb0c0; font-size: 12px; line-height: 1.75; }
+.crisis-box { margin-bottom: 17px; padding: 14px 15px; border: 1px solid rgba(255,103,79,.24); border-left: 3px solid var(--coral); border-radius: 0 9px 9px 0; background: linear-gradient(110deg,rgba(255,103,79,.12),rgba(255,103,79,.035)); }
+.crisis-box small,.stage-response > small { display: block; font: 700 8px/1.2 "IBM Plex Mono",monospace; letter-spacing: .08em; }
+.crisis-box small { color: #ff8a75; }
+.crisis-box small i { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 9px rgba(255,103,79,.7); animation: crisisPulse 1.8s ease-in-out infinite; }
+.crisis-box p { margin: 9px 0 0; color: #d1b7b4; font-size: 11px; line-height: 1.65; }
+.stage-response > small { color: #6e8ba0; }
+.stage-story { margin: 7px 0 0; color: #9bb0c0; font-size: 11px; line-height: 1.7; }
+@keyframes crisisPulse { 50% { opacity: .38; transform: scale(.78); } }
 .mission-box { border-left: 3px solid var(--coral); background: rgba(255,103,79,.08); padding: 15px 16px; margin: 22px 0; }
 .mission-box small { display: block; color: var(--coral); font: 600 9px/1 "IBM Plex Mono", monospace; margin-bottom: 7px; }
 .mission-box strong { font-size: 13px; line-height: 1.6; }

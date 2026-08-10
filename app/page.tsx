@@ -257,7 +257,14 @@ function StagePanel({
         <div><small>{stage.lesson}</small><h2>{stage.title}</h2></div>
       </div>
       <div className="location-line"><i>⌖</i> {stage.place} <span>{stage.continent}</span></div>
-      <p className="stage-story">{stage.story}</p>
+      <div className="crisis-box">
+        <small><i /> REGION CRISIS · 지역 위기 상황</small>
+        <p>{stage.crisis}</p>
+      </div>
+      <div className="stage-response">
+        <small>RESEARCH RESPONSE · 연구소 대응 계획</small>
+        <p className="stage-story">{stage.story}</p>
+      </div>
       <div className="mission-box">
         <small>MISSION OBJECTIVE</small>
         <strong>{stage.mission}</strong>

@@ -75,6 +75,8 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(page, /learning-short-answer/);
   assert.match(page, /단답형 정답/);
   assert.equal((story.match(/shortAnswer: true/g) ?? []).length, 24);
+  assert.equal((story.match(/^    crisis: /gm) ?? []).length, 10);
+  assert.match(page, /REGION CRISIS · 지역 위기 상황/);
   assert.match(page, /bacteria-idle\.png/);
   assert.match(page, /bacteria-infection\.png/);
   assert.match(styles, /@keyframes spriteIdle/);
