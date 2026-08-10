@@ -25,12 +25,13 @@ test("server-renders the Korean Factor Force shell", async () => {
 });
 
 test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic assets", async () => {
-  const [layout, page, story, styles, opening, ending, worldMap, idleGerm, infectionGerm] = await Promise.all([
+  const [layout, page, story, styles, opening, openingFirstScene, ending, worldMap, idleGerm, infectionGerm] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/story.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     access(new URL("../public/assets/story/opening.png", import.meta.url)),
+    access(new URL("../public/assets/story/opening-01.png", import.meta.url)),
     access(new URL("../public/assets/story/ending.png", import.meta.url)),
     access(new URL("../public/assets/story/world-operation-map.png", import.meta.url)),
     access(new URL("../public/assets/bacteria-idle.png", import.meta.url)),
@@ -84,6 +85,7 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(styles, /@keyframes spriteIdle/);
   assert.match(styles, /@keyframes infectionShot/);
   assert.equal(opening, undefined);
+  assert.equal(openingFirstScene, undefined);
   assert.equal(ending, undefined);
   assert.equal(worldMap, undefined);
   assert.equal(idleGerm, undefined);

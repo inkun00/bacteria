@@ -156,7 +156,7 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const sceneImages = kind === "opening"
     ? [
-      "opening.png",
+      "opening-01.png",
       "opening-bridge-01.png",
       "opening-02.png",
       "opening-bridge-02.png",
