@@ -25,7 +25,7 @@ test("server-renders the Korean Factor Force shell", async () => {
 });
 
 test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic assets", async () => {
-  const [layout, page, story, styles, opening, openingFirstScene, ending, worldMap, idleGerm, infectionGerm] = await Promise.all([
+  const [layout, page, story, styles, opening, openingFirstScene, ending, worldMap, idleGerm, infectionGerm, storyDiseaseGerm] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/story.ts", import.meta.url), "utf8"),
@@ -36,6 +36,7 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
     access(new URL("../public/assets/story/world-operation-map.png", import.meta.url)),
     access(new URL("../public/assets/bacteria-idle.png", import.meta.url)),
     access(new URL("../public/assets/bacteria-infection.png", import.meta.url)),
+    access(new URL("../public/assets/story-disease-germ-idle.png", import.meta.url)),
   ]);
 
   assert.match(layout, /Factor Force \| 약수와 배수 지구 방어대/);
@@ -82,14 +83,17 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.doesNotMatch(story, /합성수|원천균|변이|내성|치료 파동/);
   assert.match(page, /bacteria-idle\.png/);
   assert.match(page, /bacteria-infection\.png/);
+  assert.match(page, /story-disease-germ-idle\.png/);
   assert.match(styles, /@keyframes spriteIdle/);
   assert.match(styles, /@keyframes infectionShot/);
+  assert.match(styles, /@keyframes storyDiseaseIdle/);
   assert.equal(opening, undefined);
   assert.equal(openingFirstScene, undefined);
   assert.equal(ending, undefined);
   assert.equal(worldMap, undefined);
   assert.equal(idleGerm, undefined);
   assert.equal(infectionGerm, undefined);
+  assert.equal(storyDiseaseGerm, undefined);
 });
 
 test("ships the title mode selector and restored classic free battle", async () => {

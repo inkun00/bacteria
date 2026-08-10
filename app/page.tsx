@@ -104,10 +104,11 @@ function Germ({
   boss?: boolean;
 }) {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const sprite = infection ? "bacteria-infection.png" : "bacteria-idle.png";
+  const storyDisease = player === 2 && !infection;
+  const sprite = infection ? "bacteria-infection.png" : storyDisease ? "story-disease-germ-idle.png" : "bacteria-idle.png";
   return (
     <span
-      className={`germ-sprite p${player} ${infection ? "infection" : "idle"} ${boss ? "boss" : ""}`}
+      className={`germ-sprite p${player} ${infection ? "infection" : "idle"} ${storyDisease ? "story-disease" : ""} ${boss ? "boss" : ""}`}
       aria-hidden="true"
       style={{ backgroundImage: `url("${basePath}/assets/${sprite}")` }}
     >

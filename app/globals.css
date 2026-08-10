@@ -594,6 +594,16 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .germ-sprite.infection.p1 { background-position-y: 76%; }
 .germ-sprite.infection.p2 { background-position-y: 23%; }
 .germ-sprite.boss { width: 108%; filter: hue-rotate(265deg) saturate(1.45) drop-shadow(0 0 9px #f064d0); }
+.germ-sprite.story-disease.idle,
+.germ-sprite.story-disease.idle.p2 {
+  background-size: 700% auto;
+  background-position-y: 50%;
+  animation: storyDiseaseIdle 1.05s steps(6) infinite;
+  filter: drop-shadow(0 0 8px rgba(255, 37, 37, .72)) drop-shadow(0 5px 7px rgba(0, 0, 0, .58));
+}
+.germ-sprite.story-disease.boss {
+  filter: hue-rotate(265deg) saturate(1.45) drop-shadow(0 0 10px #f064d0) drop-shadow(0 5px 7px rgba(0, 0, 0, .65));
+}
 .germ-number { position: absolute; right: 3%; bottom: 8%; z-index: 4; color: #fff; font: 900 clamp(11px,1.2vw,16px) "IBM Plex Mono", monospace; line-height: 1; -webkit-text-stroke: 1px rgba(2,15,12,.82); paint-order: stroke fill; text-shadow: 0 2px 3px rgba(0,0,0,.9), 0 0 5px rgba(0,0,0,.65); }
 .germ-mode { position: absolute; left: -3%; top: 3%; z-index: 5; min-width: 22px; padding: 3px 4px; border: 1px solid; border-radius: 5px; font: normal 900 clamp(7px,.8vw,10px) "IBM Plex Mono", monospace; text-align: center; animation: petriModePop .25s ease-out; }
 .p1 .germ-mode { color: #05221d; border-color: #b6fff3; background: var(--petri-cyan-soft); box-shadow: 0 0 12px rgba(53,234,211,.4); }
@@ -688,6 +698,11 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 
 @keyframes spriteIdle { from { background-position-x: 0%; } to { background-position-x: 100%; } }
 @keyframes spriteInfect { from { background-position-x: 0%; } to { background-position-x: 100%; } }
+@keyframes storyDiseaseIdle {
+  from { background-position-x: 0%; transform: scale(.96); }
+  50% { transform: scale(1.03) rotate(-1deg); }
+  to { background-position-x: 100%; transform: scale(.96); }
+}
 @keyframes petriPulse { 50% { opacity: .35; box-shadow: 0 0 4px var(--petri-lime); } }
 @keyframes petriScan { from { top: 10%; } to { top: 90%; } }
 @keyframes petriHint { 50% { transform: scale(1.45); opacity: .25; } }
