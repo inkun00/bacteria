@@ -224,3 +224,26 @@ test("ships the title mode selector and restored classic free battle", async () 
   assert.match(freeStyles, /@keyframes infectionShot/);
   assert.match(freeStyles, /max-height: 760px/);
 });
+
+test("preserves active games and confirms navigation away", async () => {
+  const [navigation, page, freeBattle, styles] = await Promise.all([
+    readFile(new URL("../app/game-navigation.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/free-battle.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(navigation, /beforeunload/);
+  assert.match(navigation, /event\.preventDefault\(\)/);
+  assert.match(navigation, /event\.returnValue = ""/);
+  assert.match(navigation, /게임을 중단할까요/);
+  assert.match(navigation, /게임 중단/);
+  assert.match(page, /factor-force-active-battle-v1/);
+  assert.match(page, /loadActiveStoryBattle/);
+  assert.match(page, /window\.localStorage\.setItem\(STORY_BATTLE_SAVE_KEY/);
+  assert.match(page, /<GameExitPrompt/);
+  assert.match(freeBattle, /window\.localStorage\.setItem\(SAVED_GAME_KEY/);
+  assert.match(freeBattle, /window\.sessionStorage\.getItem\(SAVED_GAME_KEY\)/);
+  assert.match(freeBattle, /<GameExitPrompt/);
+  assert.match(styles, /\.game-exit-backdrop/);
+});

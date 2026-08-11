@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import FreeBattle from "./free-battle";
 import "./free-battle.css";
 import { assetUrl } from "./assets";
+import { GameExitPrompt, usePreventGameUnload } from "./game-navigation";
 import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
 import { HALL_TIERS, getHallTier, hallTierRange, normalizeHallAttempts, type HallOfFameRecord } from "./hall-of-fame";
 import {
@@ -29,6 +30,7 @@ import {
 const STORY_SAVE_KEY = "factor-force-story-progress-v2";
 const LEGACY_STORY_SAVE_KEY = "factor-force-story-progress-v1";
 const STORY_ATTEMPTS_KEY = "factor-force-story-attempts-v1";
+const STORY_BATTLE_SAVE_KEY = "factor-force-active-battle-v1";
 const STORY_STAGE_COUNT = STORY_STAGES.length;
 const BOSS_STAGE_ID = STORY_STAGES[STORY_STAGE_COUNT - 1].id;
 const MUSIC_TRACKS = {
@@ -101,7 +103,43 @@ type LearningGateState = {
   selected: string[];
   status: "answering" | "wrong" | "correct";
 };
+type SavedStoryBattle = {
+  version: 1;
+  battleStageId: number;
+  battle: StoryBattle;
+  selectedCell: number | null;
+  relationMode: RelationMode;
+  turn: 1 | 2;
+  feedback: string;
+  moveCount: number;
+  battleElapsed: number;
+  freeBattle: boolean;
+  learningGate: LearningGateState | null;
+};
 type HallOfFameStatus = "idle" | "submitting" | "success" | "error";
+
+function loadActiveStoryBattle() {
+  try {
+    const raw = window.localStorage.getItem(STORY_BATTLE_SAVE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<SavedStoryBattle>;
+    const validMode = saved.relationMode === "divisor" || saved.relationMode === "multiple" || saved.relationMode === "split";
+    const valid = saved.version === 1
+      && Number.isInteger(saved.battleStageId)
+      && (saved.battleStageId ?? 0) >= 1
+      && (saved.battleStageId ?? 0) <= STORY_STAGE_COUNT
+      && Array.isArray(saved.battle?.board)
+      && saved.battle.board.length === 49
+      && Array.isArray(saved.battle?.numbers)
+      && saved.battle.numbers.length === 49
+      && validMode;
+    if (valid) return saved as SavedStoryBattle;
+  } catch {
+    // Invalid or outdated saves are discarded below.
+  }
+  window.localStorage.removeItem(STORY_BATTLE_SAVE_KEY);
+  return null;
+}
 
 function loadProgress() {
   if (typeof window === "undefined") return [] as number[];
@@ -813,6 +851,7 @@ export default function Home() {
   const [hallOfFameComment, setHallOfFameComment] = useState("");
   const [hallOfFameStatus, setHallOfFameStatus] = useState<HallOfFameStatus>("idle");
   const [hallOfFameError, setHallOfFameError] = useState("");
+  const [storyExitPromptOpen, setStoryExitPromptOpen] = useState(false);
   const timers = useRef<number[]>([]);
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
@@ -822,6 +861,9 @@ export default function Home() {
   const selectedStage = STORY_STAGES[selectedStageId - 1];
   const battleStage = STORY_STAGES[battleStageId - 1];
   const unlocked = Math.min(STORY_STAGE_COUNT, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
+  const storyGameInProgress = hydrated && view === "battle" && !result && !cinematic && !hallOfFameOpen;
+
+  usePreventGameUnload(storyGameInProgress);
 
   useEffect(() => {
     const restoreFrame = window.requestAnimationFrame(() => {
@@ -835,6 +877,27 @@ export default function Home() {
         window.localStorage.setItem(STORY_ATTEMPTS_KEY, String(restoredAttempts));
       }
       setSelectedStageId(Math.min(STORY_STAGE_COUNT, Math.max(1, progress.length ? Math.max(...progress) + 1 : 1)));
+      const activeBattle = loadActiveStoryBattle();
+      if (activeBattle) {
+        setBattleStageId(activeBattle.battleStageId);
+        setSelectedStageId(activeBattle.battleStageId);
+        setBattle(activeBattle.battle);
+        setSelectedCell(activeBattle.selectedCell);
+        setHoveredCell(null);
+        setRelationMode(activeBattle.relationMode);
+        setTurn(activeBattle.turn === 2 ? 2 : 1);
+        setFeedback(activeBattle.feedback);
+        setMoveCount(activeBattle.moveCount);
+        setBattleElapsed(activeBattle.battleElapsed);
+        setFreeBattle(activeBattle.freeBattle);
+        setLearningGate(activeBattle.learningGate);
+        setResult(null);
+        setBusy(false);
+        setFlash({ infected: [], resisted: [] });
+        setInfectionShot(null);
+        setBossDefeatCell(null);
+        setView("battle");
+      }
       setHydrated(true);
     });
     return () => {
@@ -945,10 +1008,33 @@ export default function Home() {
   }, [bossDefeatCell, cinematic, result]);
 
   useEffect(() => {
-    if (view !== "battle" || result) return;
+    if (view !== "battle" || result || storyExitPromptOpen) return;
     const timer = window.setInterval(() => setBattleElapsed((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [result, view]);
+  }, [result, storyExitPromptOpen, view]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!storyGameInProgress) {
+      window.localStorage.removeItem(STORY_BATTLE_SAVE_KEY);
+      return;
+    }
+    if (busy || infectionShot || bossDefeatCell !== null) return;
+    const saved: SavedStoryBattle = {
+      version: 1,
+      battleStageId,
+      battle,
+      selectedCell,
+      relationMode,
+      turn,
+      feedback,
+      moveCount,
+      battleElapsed,
+      freeBattle,
+      learningGate,
+    };
+    window.localStorage.setItem(STORY_BATTLE_SAVE_KEY, JSON.stringify(saved));
+  }, [battle, battleElapsed, battleStageId, bossDefeatCell, busy, feedback, freeBattle, hydrated, infectionShot, learningGate, moveCount, relationMode, selectedCell, storyGameInProgress, turn]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1008,6 +1094,7 @@ export default function Home() {
     setResult(null);
     setBossDefeatCell(null);
     setLearningGate(null);
+    setStoryExitPromptOpen(false);
     setFlash({ infected: [], resisted: [] });
     setInfectionShot(null);
     setFeedback(`${MODE_COPY[stage.modes[0]].label} 준비 완료. ${stage.mission}`);
@@ -1257,7 +1344,7 @@ export default function Home() {
     executePlayerMove({ from: selectedCell, to: index, distance });
   }, [battle.board, battle.numbers, battleStage.modes, busy, executePlayerMove, relationMode, result, selectedCell, turn]);
 
-  const returnToMap = () => {
+  const returnToMap = useCallback(() => {
     timers.current.forEach((timer) => window.clearTimeout(timer));
     timers.current = [];
     const nextStage = Math.min(STORY_STAGE_COUNT, Math.max(...completed, battleStage.id) + 1);
@@ -1266,12 +1353,28 @@ export default function Home() {
     setResult(null);
     setBusy(false);
     setFreeBattle(false);
-  };
+    setStoryExitPromptOpen(false);
+  }, [battleStage.id, completed]);
+
+  const requestReturnToMap = useCallback(() => {
+    if (storyGameInProgress) {
+      setStoryExitPromptOpen(true);
+      return;
+    }
+    returnToMap();
+  }, [returnToMap, storyGameInProgress]);
+
+  const stopStoryBattle = useCallback(() => {
+    window.localStorage.removeItem(STORY_BATTLE_SAVE_KEY);
+    setStoryExitPromptOpen(false);
+    returnToMap();
+  }, [returnToMap]);
 
   const resetCompletedStory = useCallback(() => {
     window.localStorage.removeItem(STORY_SAVE_KEY);
     window.localStorage.removeItem(LEGACY_STORY_SAVE_KEY);
     window.localStorage.removeItem(STORY_ATTEMPTS_KEY);
+    window.localStorage.removeItem(STORY_BATTLE_SAVE_KEY);
     setCinematic(null);
     setResult(null);
     setLearningGate(null);
@@ -1411,14 +1514,14 @@ export default function Home() {
       ) : (
         <div className="petri-battle-screen">
           <header className="petri-topbar">
-            <button className="petri-brand" onClick={returnToMap} aria-label="세계 작전 지도로 돌아가기">
+            <button className="petri-brand" onClick={requestReturnToMap} aria-label="세계 작전 지도로 돌아가기">
               <span className="petri-brand-mark"><i /><i /><i /></span>
               <span><strong>페트리</strong><small>{"// 07"}</small></span>
             </button>
             <div className="petri-topbar-center"><span className="petri-live-dot" /><span>게임 시간</span><b>{formatTime(battleElapsed)}</b></div>
             <nav className="petri-top-actions" aria-label="전투 메뉴">
               <button aria-label="학습 목표" title={battleStage.learning}>?</button>
-              <button className="petri-stage-button" onClick={returnToMap}><span>{freeBattle ? "자유 대전" : `${battleStage.lesson} · 7×7`}</span><b>지도</b></button>
+              <button className="petri-stage-button" onClick={requestReturnToMap}><span>{freeBattle ? "자유 대전" : `${battleStage.lesson} · 7×7`}</span><b>지도</b></button>
             </nav>
           </header>
 
@@ -1463,7 +1566,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="petri-board-controls">
-                <button onClick={returnToMap}><span>↶</span> 작전 지도</button>
+                <button onClick={requestReturnToMap}><span>↶</span> 작전 지도</button>
                 <div className="petri-mode-controls" aria-label="치료 모드">
                   {selectedCell !== null ? (
                     <button
@@ -1529,6 +1632,10 @@ export default function Home() {
           onSubmit={submitLearningAnswer}
           onAdvance={advanceLearningGate}
         />
+      )}
+
+      {storyExitPromptOpen && (
+        <GameExitPrompt onContinue={() => setStoryExitPromptOpen(false)} onStop={stopStoryBattle} />
       )}
 
       {cinematic && <Cinematic kind={cinematic} onFinish={handleCinematicFinish} />}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { assetUrl } from "./assets";
+import { GameExitPrompt, usePreventGameUnload } from "./game-navigation";
 import {
   applyMove,
   chooseAiAction,
@@ -35,6 +36,7 @@ type Snapshot = {
 
 type SavedGame = {
   version: 1;
+  started?: boolean;
   board: Cell[];
   numbers: NumberCell[];
   currentPlayer: Player;
@@ -156,8 +158,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [chargeBurst, setChargeBurst] = useState<Player | null>(null);
   const [bombArmed, setBombArmed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
   const [restartPromptOpen, setRestartPromptOpen] = useState(false);
-  const [restartReason, setRestartReason] = useState<"refresh" | "escape" | "manual">("manual");
+  const [restartReason, setRestartReason] = useState<"escape" | "manual">("manual");
+  const [exitPromptOpen, setExitPromptOpen] = useState(false);
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [infection, setInfection] = useState<{ cells: number[]; player: Player } | null>(null);
   const [resisted, setResisted] = useState<number[]>([]);
@@ -168,6 +172,9 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
   const sequenceTimers = useRef<number[]>([]);
   const animationWatchdog = useRef<number | null>(null);
+  const gameInProgress = hydrated && gameStarted && !gameOver;
+
+  usePreventGameUnload(gameInProgress);
 
   useEffect(() => {
     const infectionSfx = new Audio(assetUrl("/assets/audio/infection-splat.ogg"));
@@ -193,7 +200,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     const restoreFrame = window.requestAnimationFrame(() => {
       try {
-      const raw = window.sessionStorage.getItem(SAVED_GAME_KEY);
+      const raw = window.localStorage.getItem(SAVED_GAME_KEY)
+        ?? window.sessionStorage.getItem(SAVED_GAME_KEY);
       const saved = raw ? JSON.parse(raw) as Partial<SavedGame> : null;
       const savedSize = Array.isArray(saved?.board) ? Math.sqrt(saved.board.length) : 0;
       const valid = saved?.version === 1
@@ -210,6 +218,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         setSettings(restoredSettings);
         setDraftSettings(restoredSettings);
         setSetupOpen(saved.setupOpen ?? true);
+        setGameStarted(saved.started ?? saved.setupOpen === false);
         setGameOver(saved.gameOver ?? false);
         setWinner(saved.winner === 1 || saved.winner === 2 ? saved.winner : 0);
         setMoveNumber(saved.moveNumber ?? 1);
@@ -220,13 +229,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         setBombArmed(saved.bombArmed ?? false);
         setHistory(saved.history ?? []);
 
-        const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-        if (navigation?.type === "reload" && saved.setupOpen === false && !saved.gameOver) {
-          setRestartReason("refresh");
-          setRestartPromptOpen(true);
-        }
+        window.sessionStorage.removeItem(SAVED_GAME_KEY);
       }
       } catch {
+        window.localStorage.removeItem(SAVED_GAME_KEY);
         window.sessionStorage.removeItem(SAVED_GAME_KEY);
       } finally {
         setHydrated(true);
@@ -345,7 +351,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   }, [playTone, settings.mode]);
 
   const executeMove = useCallback((move: Move, player: Player, mode: RelationMode = relationMode, useBomb = false) => {
-    if (gameOver || animating || restartPromptOpen) return;
+    if (gameOver || animating || restartPromptOpen || exitPromptOpen) return;
     clearSequenceTimers();
     setAnimating(true);
     setHistory((previous) => [...previous, {
@@ -461,12 +467,12 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       setNotice(`${resultNotice}${chargeLabel}`);
       schedule(finishSequence, result.resisted.length ? 1050 : 560);
     }
-  }, [animating, board, bombCharge, bombs, captures, clearSequenceTimers, currentPlayer, gameOver, moveNumber, numbers, playTone, relationMode, resolveEnd, restartPromptOpen, schedule]);
+  }, [animating, board, bombCharge, bombs, captures, clearSequenceTimers, currentPlayer, exitPromptOpen, gameOver, moveNumber, numbers, playTone, relationMode, resolveEnd, restartPromptOpen, schedule]);
 
   // AI turn orchestration mirrors the timer lifecycle in visible UI state.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (setupOpen || restartPromptOpen || gameOver || animating || settings.mode !== "ai" || currentPlayer !== 2) {
+    if (setupOpen || restartPromptOpen || exitPromptOpen || gameOver || animating || settings.mode !== "ai" || currentPlayer !== 2) {
       setThinking(false);
       return;
     }
@@ -505,21 +511,22 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       window.clearTimeout(targetTimer);
       window.clearTimeout(moveTimer);
     };
-  }, [animating, board, bombs, currentPlayer, executeMove, gameOver, numbers, playTone, resolveEnd, restartPromptOpen, settings, setupOpen]);
+  }, [animating, board, bombs, currentPlayer, executeMove, exitPromptOpen, gameOver, numbers, playTone, resolveEnd, restartPromptOpen, settings, setupOpen]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => () => clearSequenceTimers(), [clearSequenceTimers]);
 
   useEffect(() => {
-    if (setupOpen || restartPromptOpen || gameOver) return;
+    if (setupOpen || restartPromptOpen || exitPromptOpen || gameOver) return;
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [gameOver, restartPromptOpen, setupOpen]);
+  }, [exitPromptOpen, gameOver, restartPromptOpen, setupOpen]);
 
   useEffect(() => {
     if (!hydrated || animating) return;
     const saved: SavedGame = {
       version: 1,
+      started: gameStarted,
       board,
       numbers,
       currentPlayer,
@@ -537,8 +544,9 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       bombArmed,
       history,
     };
-    window.sessionStorage.setItem(SAVED_GAME_KEY, JSON.stringify(saved));
-  }, [animating, board, bombArmed, bombCharge, bombs, captures, currentPlayer, elapsed, gameOver, history, hydrated, moveNumber, numbers, relationMode, selected, settings, setupOpen, winner]);
+    window.localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(saved));
+    window.sessionStorage.removeItem(SAVED_GAME_KEY);
+  }, [animating, board, bombArmed, bombCharge, bombs, captures, currentPlayer, elapsed, gameOver, gameStarted, history, hydrated, moveNumber, numbers, relationMode, selected, settings, setupOpen, winner]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -575,6 +583,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     setBombCharge([0, 0]);
     setChargeBurst(null);
     setBombArmed(false);
+    setGameStarted(true);
+    setExitPromptOpen(false);
     setRestartPromptOpen(false);
     setHistory([]);
     setInfection(null);
@@ -584,8 +594,25 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     setSetupOpen(false);
   }, [clearSequenceTimers, draftSettings]);
 
+  const requestExit = useCallback(() => {
+    if (gameInProgress) {
+      setRulesOpen(false);
+      setExitPromptOpen(true);
+      return;
+    }
+    onExit();
+  }, [gameInProgress, onExit]);
+
+  const stopAndExit = useCallback(() => {
+    window.localStorage.removeItem(SAVED_GAME_KEY);
+    window.sessionStorage.removeItem(SAVED_GAME_KEY);
+    setGameStarted(false);
+    setExitPromptOpen(false);
+    onExit();
+  }, [onExit]);
+
   const handleCell = (index: number) => {
-    if (gameOver || restartPromptOpen || thinking || animating || (settings.mode === "ai" && currentPlayer === 2)) return;
+    if (gameOver || restartPromptOpen || exitPromptOpen || thinking || animating || (settings.mode === "ai" && currentPlayer === 2)) return;
     const move = targetMap.get(index);
     if (move) {
       executeMove(move, currentPlayer, relationMode, bombArmed);
@@ -612,7 +639,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   };
 
   const undo = () => {
-    if (!history.length || restartPromptOpen || thinking || animating) return;
+    if (!history.length || restartPromptOpen || exitPromptOpen || thinking || animating) return;
     const steps = settings.mode === "ai" ? Math.min(2, history.length) : 1;
     const snapshot = history[history.length - steps];
     setBoard(snapshot.board);
@@ -651,7 +678,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       <div className="ambient ambient-two" />
 
       <header className="topbar">
-        <button className="brand" onClick={onExit} aria-label="게임 시작 화면으로 돌아가기">
+        <button className="brand" onClick={requestExit} aria-label="게임 시작 화면으로 돌아가기">
           <span className="brand-mark"><i /><i /><i /></span>
           <span><strong>페트리</strong><small>{"// 07"}</small></span>
         </button>
@@ -894,7 +921,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             </div>
 
             <button className="launch-button" onClick={() => startGame()}><span>게임 시작</span><i>→</i></button>
-            <button className="free-exit-button" onClick={onExit}>← 게임 시작 화면</button>
+            <button className="free-exit-button" onClick={requestExit}>← 게임 시작 화면</button>
             <button className="rules-link" onClick={() => setRulesOpen(true)}>게임 규칙 보기 <span>?</span></button>
           </section>
         </div>
@@ -932,9 +959,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             <small>다시 시작하기</small>
             <h2 id="restart-title">게임을 다시 시작할까요?</h2>
             <p id="restart-description">
-              {restartReason === "refresh"
-                ? "새로고침 전 게임을 그대로 불러왔어요. 새 게임을 시작할지 골라 주세요."
-                : restartReason === "escape"
+              {restartReason === "escape"
                   ? "나가기 키를 눌렀어요. 지금 게임을 이어 하거나 새로 시작할 수 있어요."
                   : "지금까지 한 내용을 지우고 같은 설정으로 새 게임을 시작해요."}
             </p>
@@ -944,6 +969,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             </div>
           </section>
         </div>
+      )}
+
+      {exitPromptOpen && (
+        <GameExitPrompt onContinue={() => setExitPromptOpen(false)} onStop={stopAndExit} />
       )}
 
       {gameOver && !setupOpen && (

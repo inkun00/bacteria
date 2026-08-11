@@ -1176,3 +1176,61 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
   .hall-rank-player img { width: 43px; height: 43px; }
   .hall-tier-grid { grid-template-columns: 1fr; }
 }
+
+/* Shared confirmation shown before leaving an active game. */
+.game-exit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 8, 8, .82);
+  backdrop-filter: blur(12px);
+}
+.game-exit-modal {
+  width: min(440px, 100%);
+  padding: 34px;
+  border: 1px solid rgba(52, 226, 206, .48);
+  border-radius: 22px;
+  color: #eafff9;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(5, 38, 33, .98), rgba(2, 20, 18, .99));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .7), 0 0 40px rgba(52, 226, 206, .08);
+}
+.game-exit-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 15px;
+  border: 1px solid rgba(255, 135, 112, .72);
+  border-radius: 50%;
+  color: #ff9c84;
+  background: rgba(255, 92, 75, .1);
+  font: 900 25px/1 Arial, sans-serif;
+  box-shadow: 0 0 24px rgba(255, 92, 75, .18);
+}
+.game-exit-modal > small {
+  color: #42e3d0;
+  font: 800 10px "IBM Plex Mono", monospace;
+  letter-spacing: .18em;
+}
+.game-exit-modal h2 { margin: 10px 0 12px; font-size: 28px; }
+.game-exit-modal p { margin: 0; color: #a9c7bf; font-size: 14px; line-height: 1.65; }
+.game-exit-modal > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 26px; }
+.game-exit-modal button {
+  min-height: 48px;
+  border: 1px solid;
+  border-radius: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.game-exit-continue { border-color: #39ddca !important; color: #031c18; background: #39ddca; }
+.game-exit-stop { border-color: rgba(255, 135, 112, .42) !important; color: #ffad98; background: rgba(255, 92, 75, .08); }
+
+@media (max-width: 520px) {
+  .game-exit-modal { padding: 28px 20px; }
+  .game-exit-modal h2 { font-size: 24px; }
+  .game-exit-modal > div { grid-template-columns: 1fr; }
+}
