@@ -13,14 +13,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Factor Force | 약수와 배수 지구 방어대",
     description: "10개 세계 작전에서 2~10차시의 약수와 배수를 배우고 지구를 구하세요.",
-    images: [`${basePath}/og-commercial.png`],
+    images: [`${basePath}/og-commercial.jpg`],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Factor Force | 약수와 배수 지구 방어대",
     description: "약수와 배수로 지구를 구하는 수학 게임",
-    images: [`${basePath}/og-commercial.png`],
+    images: [`${basePath}/og-commercial.jpg`],
   },
 };
 

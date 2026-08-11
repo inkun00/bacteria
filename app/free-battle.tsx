@@ -60,6 +60,8 @@ type InfectionProjectile = {
   bomb: boolean;
 };
 
+const INFECTION_STAGGER_MS = 45;
+
 const DIFFICULTY = {
   easy: { label: "쉬움", detail: "천천히 생각해요", bars: 1 },
   medium: { label: "보통", detail: "알맞게 생각해요", bars: 2 },
@@ -163,8 +165,31 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [arrived, setArrived] = useState<number | null>(null);
   const [notice, setNotice] = useState("내 세균을 고른 뒤 약수·배수·분열 중 하나를 선택하세요");
   const audioRef = useRef<AudioContext | null>(null);
+  const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
   const sequenceTimers = useRef<number[]>([]);
   const animationWatchdog = useRef<number | null>(null);
+
+  useEffect(() => {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    const infectionSfx = new Audio(`${basePath}/assets/audio/infection-splat.ogg`);
+    infectionSfx.preload = "auto";
+    infectionSfx.volume = 0.56;
+    infectionSfx.load();
+    infectionSfxRef.current = infectionSfx;
+
+    return () => {
+      infectionSfx.pause();
+      infectionSfxRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (soundOn) return;
+    const infectionSfx = infectionSfxRef.current;
+    if (!infectionSfx) return;
+    infectionSfx.pause();
+    infectionSfx.currentTime = 0;
+  }, [soundOn]);
 
   useEffect(() => {
     const restoreFrame = window.requestAnimationFrame(() => {
@@ -266,6 +291,13 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
 
   const playTone = useCallback((kind: "move" | "infect" | "win" | "select") => {
     if (!soundOn || typeof window === "undefined") return;
+    if (kind === "infect") {
+      const infectionSfx = infectionSfxRef.current;
+      if (!infectionSfx) return;
+      infectionSfx.currentTime = 0;
+      infectionSfx.play().catch(() => undefined);
+      return;
+    }
     try {
       const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtor) return;
@@ -275,8 +307,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       if (context.state === "suspended") void context.resume().catch(() => undefined);
       const oscillator = context.createOscillator();
       const gain = context.createGain();
-      const frequencies = { select: 420, move: 280, infect: 160, win: 620 };
-      oscillator.type = kind === "infect" ? "sawtooth" : "sine";
+      const frequencies = { select: 420, move: 280, win: 620 };
+      oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequencies[kind], context.currentTime);
       if (kind === "win") oscillator.frequency.exponentialRampToValueAtTime(980, context.currentTime + 0.22);
       gain.gain.setValueAtTime(0.0001, context.currentTime);
@@ -419,7 +451,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         setNotice(`상대 세균 ${result.infected.length}개가 내 편이 되었어요${chargeLabel}`);
         playTone("infect");
       }, 820);
-      schedule(finishSequence, 1580);
+      schedule(finishSequence, 1580 + Math.max(0, result.infected.length - 1) * INFECTION_STAGGER_MS);
     } else {
       setResisted(result.resisted);
       const resultNotice = useBomb && !bombUsed
@@ -670,6 +702,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                 {board.map((cell, index) => {
                   const move = targetMap.get(index);
                   const isInfected = infection?.cells.includes(index) ?? false;
+                  const infectionOrder = isInfected ? infection?.cells.indexOf(index) ?? -1 : -1;
                   const comparison = previewComparisons.get(index);
                   const isResisted = resisted.includes(index);
                   const row = Math.floor(index / boardSize) + 1;
@@ -688,6 +721,9 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                         arrived === index ? "arrived" : "",
                         isInfected ? "hit" : "",
                       ].filter(Boolean).join(" ")}
+                      style={isInfected ? {
+                        "--impact-delay": `${infectionOrder * INFECTION_STAGGER_MS}ms`,
+                      } as CSSProperties : undefined}
                       onClick={() => handleCell(index)}
                       onMouseEnter={() => move && setHovered(index)}
                       onMouseLeave={() => setHovered(null)}

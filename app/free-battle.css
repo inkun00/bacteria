@@ -100,7 +100,7 @@
   border-radius: 11px;
   background: rgba(9, 28, 24, .64);
 }
-.free-battle .turn-beacon { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid; border-radius: 8px; font: 800 9px var(--font-geist-mono), monospace; }
+.free-battle .turn-beacon { width: auto; min-width: 52px; height: 36px; padding: 0 8px; display: grid; place-items: center; border: 1px solid; border-radius: 8px; font: 800 9px/1 var(--font-geist-mono), monospace; white-space: nowrap; }
 .free-battle .turn-beacon.p1 { color: var(--cyan); border-color: rgba(53,234,211,.42); background: rgba(53,234,211,.08); box-shadow: inset 0 0 12px rgba(53,234,211,.1); }
 .free-battle .turn-beacon.p2 { color: var(--coral); border-color: rgba(255,109,104,.42); background: rgba(255,109,104,.08); box-shadow: inset 0 0 12px rgba(255,109,104,.1); }
 .free-battle .status-copy { min-width: 0; }
@@ -219,8 +219,8 @@
 .free-battle .resist-mark { position: absolute; left: 50%; top: -6px; z-index: 12; transform: translateX(-50%); padding: 2px 5px; border-radius: 4px; color: #ffd99d; background: #3b2814; font: 800 6px var(--font-geist-mono), monospace; white-space: nowrap; }
 .free-battle .bomb-equipped { position: absolute; right: 4px; top: 4px; z-index: 13; display: grid; place-items: center; width: 21px; height: 21px; border: 1px solid #ffe39a; border-radius: 50%; color: #fff4c5; background: radial-gradient(circle at 36% 32%, #fff6bc 0 9%, #ffb832 26%, #8f3513 68%, #271006 100%); font-size: 12px; box-shadow: 0 0 8px #ffcf59, 0 0 18px rgba(255,113,38,.7); animation: bombPulse .72s ease-in-out infinite alternate; }
 .free-battle .cell.arrived .germ-sprite { animation: land .48s cubic-bezier(.2,.9,.25,1.25), spriteIdle 1.35s steps(6) .48s infinite; }
-.free-battle .cell.hit { z-index: 7; animation: cellImpact .72s ease-out; }
-.free-battle .cell.hit::after { content: ""; position: absolute; inset: 7%; z-index: 3; pointer-events: none; border: 2px solid rgba(255,255,255,.9); border-radius: 50%; box-shadow: 0 0 18px currentColor, inset 0 0 14px currentColor; animation: impactRing .68s ease-out forwards; }
+.free-battle .cell.hit { z-index: 7; animation: cellImpact .72s ease-out var(--impact-delay, 0ms) both; }
+.free-battle .cell.hit::after { content: ""; position: absolute; inset: 7%; z-index: 3; pointer-events: none; border: 2px solid rgba(255,255,255,.9); border-radius: 50%; box-shadow: 0 0 18px currentColor, inset 0 0 14px currentColor; animation: impactRing .68s ease-out var(--impact-delay, 0ms) both; }
 
 .free-battle .infection-projectile-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
 .free-battle .infection-projectile { position: absolute; left: var(--sx); top: var(--sy); width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0; animation: infectionShot 560ms cubic-bezier(.22,.68,.24,1) var(--delay) both; }
@@ -237,7 +237,7 @@
 .free-battle .germ-sprite.idle { background-size: 700% auto; animation: spriteIdle 1.35s steps(6) infinite; }
 .free-battle .germ-sprite.idle.p1 { background-position-y: 20%; }
 .free-battle .germ-sprite.idle.p2 { background-position-y: 77%; }
-.free-battle .germ-sprite.infection { background-size: 700% auto; animation: spriteInfect .72s steps(6) forwards; transform: scale(1.14); }
+.free-battle .germ-sprite.infection { background-size: 700% auto; animation: spriteInfect .72s steps(6) var(--impact-delay, 0ms) both; transform: scale(1.14); }
 .free-battle .germ-sprite.infection.p1 { background-position-y: 76%; }
 .free-battle .germ-sprite.infection.p2 { background-position-y: 23%; }
 .free-battle .germ-number { position: absolute; right: 3%; bottom: 8%; z-index: 4; display: block; padding: 0; border: 0; color: #fff; background: transparent; font: 900 clamp(11px, 1.2vw, 16px) var(--font-geist-mono), monospace; line-height: 1; -webkit-text-stroke: 1px rgba(2,15,12,.82); paint-order: stroke fill; text-shadow: 0 2px 3px rgba(0,0,0,.9), 0 0 5px rgba(0,0,0,.65); box-shadow: none; }

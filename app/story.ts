@@ -803,7 +803,7 @@ export function applyStoryMove(
   const resisted: number[] = [];
   let bossHit = false;
   let bossHp = battle.bossHp;
-  let bossPhase = battle.bossPhase;
+  const bossPhase = battle.bossPhase;
   const size = getBoardSize(board);
   const row = Math.floor(move.to / size);
   const col = move.to % size;
@@ -821,11 +821,9 @@ export function applyStoryMove(
         continue;
       }
 
-      if (player === 1 && battle.bossIndex === index && stage.boss) {
+      if (player === 1 && battle.bossHp > 0 && battle.bossIndex === index && stage.boss) {
         bossHit = true;
         bossHp = Math.max(0, bossHp - 1);
-        bossPhase = (bossPhase + 1) % stage.boss.sequence.length;
-        numbers[index] = stage.boss.sequence[bossPhase];
         if (bossHp === 0) {
           board[index] = 1;
           numbers[index] = attackNumber;
@@ -848,7 +846,7 @@ export function applyStoryMove(
     infected,
     resisted,
     relationText: bossHit && bossHp > 0
-      ? `보스 치료 성공! 앞으로 ${bossHp}번 더 치료해야 해요. 숫자가 ${numbers[battle.bossIndex ?? 0]}(으)로 바뀌었어요.`
+      ? `보스 치료 성공! 앞으로 ${bossHp}번 더 치료해야 해요. 보스는 다음 턴에 숫자를 바꿔요.`
       : feedback,
     bossHit,
   };
@@ -856,6 +854,8 @@ export function applyStoryMove(
 
 export function chooseStoryAiMove(battle: StoryBattle, stage: StoryStage): { move: Move; mode: StoryMode } | null {
   const livingBossIndex = stage.boss && battle.bossHp > 0 ? battle.bossIndex : null;
+  // 보스가 복제 이동한 턴에는 일반 질병 세균의 추가 이동을 생략해 적 행동을 한 번으로 제한합니다.
+  if (livingBossIndex !== null && battle.bossTurn > 0 && battle.bossTurn % 2 === 0) return null;
   const availableMoves = legalMoves(battle.board, 2)
     .filter((move) => move.from !== livingBossIndex);
   const moves = stage.enemyMovement === "jump-only"

@@ -11,8 +11,8 @@
     "build:pages": "vinext build",
     "build:vercel": "vite build",
     "start": "vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/boss-logic.test.mjs tests/hall-of-fame.test.mjs",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

@@ -39,14 +39,14 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
     access(new URL("../public/assets/story-disease-germ-idle.webp", import.meta.url)),
     access(new URL("../public/assets/boss-germ-sprite.webp", import.meta.url)),
     access(new URL("../public/assets/audio/space-battle.ogg", import.meta.url)),
-    access(new URL("../public/assets/audio/mission-pulse.mp3", import.meta.url)),
+    access(new URL("../public/assets/audio/mission-pulse.ogg", import.meta.url)),
     access(new URL("../public/assets/audio/opening-suspense.ogg", import.meta.url)),
-    access(new URL("../public/assets/audio/ending-revelation.mp3", import.meta.url)),
-    access(new URL("../public/assets/audio/infection-splat.wav", import.meta.url)),
-    access(new URL("../public/assets/audio/stage-clear.mp3", import.meta.url)),
-    access(new URL("../public/assets/audio/stage-failed.mp3", import.meta.url)),
-    access(new URL("../public/assets/audio/boss-clear.wav", import.meta.url)),
-    access(new URL("../public/assets/audio/boss-defeat.mp3", import.meta.url)),
+    access(new URL("../public/assets/audio/ending-revelation.ogg", import.meta.url)),
+    access(new URL("../public/assets/audio/infection-splat.ogg", import.meta.url)),
+    access(new URL("../public/assets/audio/stage-clear.ogg", import.meta.url)),
+    access(new URL("../public/assets/audio/stage-failed.ogg", import.meta.url)),
+    access(new URL("../public/assets/audio/boss-clear.ogg", import.meta.url)),
+    access(new URL("../public/assets/audio/boss-defeat.ogg", import.meta.url)),
     readFile(new URL("../public/assets/audio/CREDITS.md", import.meta.url), "utf8"),
   ]);
   const endingScenes = await Promise.all(Array.from({ length: 8 }, (_, index) =>
@@ -138,22 +138,24 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.equal(bossDefeatSound, undefined);
   assert.match(audioCredits, /CC0 1\.0/);
   assert.match(page, /space-battle\.ogg/);
-  assert.match(page, /mission-pulse\.mp3/);
+  assert.match(page, /mission-pulse\.ogg/);
   assert.match(page, /opening-suspense\.ogg/);
-  assert.match(page, /ending-revelation\.mp3/);
+  assert.match(page, /ending-revelation\.ogg/);
   assert.match(page, /cinematic === "opening"[\s\S]*?MUSIC_TRACKS\.opening[\s\S]*?cinematic === "ending"[\s\S]*?MUSIC_TRACKS\.ending/);
   assert.match(page, /window\.localStorage\.removeItem\(STORY_SAVE_KEY\)/);
   assert.match(page, /window\.localStorage\.removeItem\(LEGACY_STORY_SAVE_KEY\)/);
   assert.match(page, /setCompleted\(\[\]\)[\s\S]*?setSelectedStageId\(1\)[\s\S]*?setView\("title"\)/);
   assert.match(page, /view === "battle" \|\| view === "free"/);
+  assert.match(page, /명예의 전당에 기록 올리기/);
   assert.match(page, /MUSIC_TRACKS\.mission/);
   assert.match(page, /bgm\.currentTime = 0/);
-  assert.match(page, /infection-splat\.wav/);
-  assert.match(page, /infectionShot\?\.player !== 2/);
-  assert.match(page, /stage-clear\.mp3/);
-  assert.match(page, /stage-failed\.mp3/);
-  assert.match(page, /boss-clear\.wav/);
-  assert.match(page, /boss-defeat\.mp3/);
+  assert.match(page, /infection-splat\.ogg/);
+  assert.match(page, /infectionShot\?\.targets\.length/);
+  assert.doesNotMatch(page, /infectionShot\?\.player !== 2/);
+  assert.match(page, /stage-clear\.ogg/);
+  assert.match(page, /stage-failed\.ogg/);
+  assert.match(page, /boss-clear\.ogg/);
+  assert.match(page, /boss-defeat\.ogg/);
   assert.match(page, /cinematic === "ending" \? "bossClear" : result/);
   assert.match(page, /bossDefeatCell !== null \? "bossDefeat"/);
   assert.match(page, /bossDefeated \? 2200/);
