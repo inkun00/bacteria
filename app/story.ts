@@ -44,6 +44,7 @@ export type StoryStage = {
   playerNumbers: number[];
   enemyNumbers: number[];
   difficulty: 1 | 2 | 3;
+  enemyMovement?: "any" | "jump-only";
   boss?: { hp: number; sequence: number[] };
 };
 
@@ -189,8 +190,9 @@ export const STORY_STAGES: StoryStage[] = [
     example: "3 → 12는 배수 관계, 12 → 4는 약수 관계",
     modes: ["divisor", "multiple"],
     playerNumbers: [6, 8, 9],
-    enemyNumbers: [2, 3, 4, 12, 16, 18, 24, 27],
-    difficulty: 3,
+    enemyNumbers: [2, 3, 4, 12, 16, 18],
+    difficulty: 1,
+    enemyMovement: "jump-only",
   },
   {
     id: 8,
@@ -226,7 +228,8 @@ export const STORY_STAGES: StoryStage[] = [
     modes: ["divisor", "multiple", "split"],
     playerNumbers: [8, 12, 18],
     enemyNumbers: [2, 3, 4, 6, 16, 24, 36, 54, 72],
-    difficulty: 3,
+    difficulty: 2,
+    enemyMovement: "jump-only",
   },
   {
     id: 10,
@@ -237,14 +240,15 @@ export const STORY_STAGES: StoryStage[] = [
     x: 92,
     y: 58,
     crisis: "태평양 무인도의 우두머리 세균이 계속 숫자를 바꾸며 전 세계에 세균을 다시 퍼뜨리고 있습니다. 지금 없애지 못하면 이미 구한 지역도 다시 감염됩니다.",
-    story: "모든 감염을 시작한 우두머리 세균이 태평양 무인도에 나타났습니다. 숫자를 바꾸며 주변 세균을 되살리는 보스를 여러 번 치료하세요.",
-    mission: "모든 모드로 보스를 5번 치료하고 남은 질병 세균도 모두 없애세요.",
+    story: "모든 감염을 시작한 우두머리 세균이 태평양 무인도에 나타났습니다. 보스는 두 턴마다 한 칸씩 복제 이동하며 질병 세균을 늘립니다. 숫자 관계를 살펴 여러 번 치료하세요.",
+    mission: "두 턴마다 복제 이동하는 보스를 모든 모드로 5번 치료하고 남은 질병 세균도 모두 없애세요.",
     learning: "2~10차시에 배운 약수와 배수 내용을 모두 다시 확인합니다.",
-    example: "보스가 12 → 18 → 24 → 30 → 36으로 숫자를 바꾸므로 매번 관계를 다시 확인",
+    example: "보스는 12 → 18 → 24 → 30 → 36으로 수를 바꾸고, 두 턴마다 인접한 칸으로 복제 이동",
     modes: ["divisor", "multiple", "split"],
     playerNumbers: [6, 8, 12, 18],
-    enemyNumbers: [2, 3, 4, 6, 12, 18, 24, 30],
-    difficulty: 3,
+    enemyNumbers: [2, 3, 4, 6, 12, 18],
+    difficulty: 1,
+    enemyMovement: "jump-only",
     boss: { hp: 5, sequence: [12, 18, 24, 30, 36] },
   },
 ];
@@ -252,421 +256,429 @@ export const STORY_STAGES: StoryStage[] = [
 export const STAGE_LEARNING_TASKS: Record<number, LearningTask[]> = {
   1: [
     {
-      id: "divisors-of-12",
-      prompt: "12의 약수를 모두 선택하세요.",
-      context: "12를 나누었을 때 나머지가 0인 수를 모두 찾아 마지막 문제를 푸세요.",
-      options: ["1", "2", "3", "4", "5", "6", "8", "12"],
-      answers: ["1", "2", "3", "4", "6", "12"],
+      id: "divisors-of-20",
+      prompt: "20의 약수를 모두 고르세요.",
+      context: "20을 나누었을 때 나누어떨어지는 수를 빠짐없이 찾아보세요.",
+      options: ["1", "2", "4", "5", "8", "10", "20"],
+      answers: ["1", "2", "4", "5", "10", "20"],
       multiple: true,
-      explanation: "12는 1, 2, 3, 4, 6, 12로 나누어떨어집니다. 따라서 이 수들이 12의 약수입니다.",
+      explanation: "20은 1, 2, 4, 5, 10, 20으로 나누어떨어지므로 이 수들이 20의 약수입니다.",
     },
     {
-      id: "divisor-remainder",
-      prompt: "5가 12의 약수가 아닌 까닭은 무엇일까요?",
-      context: "약수인지 알아보려면 무엇을 확인해야 하는지 고르세요.",
-      options: ["12 ÷ 5의 나머지가 0이 아니기 때문", "5가 12보다 작기 때문", "5가 홀수이기 때문"],
-      answers: ["12 ÷ 5의 나머지가 0이 아니기 때문"],
-      explanation: "어떤 수로 나누었을 때 나머지가 0이어야 그 수의 약수입니다.",
+      id: "number-from-divisors",
+      prompt: "약수가 1, 2, 7, 14인 수는 어느 것인가요?",
+      context: "어떤 수의 약수를 모두 나타낸 것을 보고 원래 수를 찾아보세요.",
+      options: ["7", "12", "14", "28"],
+      answers: ["14"],
+      explanation: "14를 나누어떨어지게 하는 수는 1, 2, 7, 14이므로 정답은 14입니다.",
     },
     {
-      id: "divisor-count-7",
-      prompt: "7의 약수는 모두 몇 개일까요?",
-      context: "7을 나누어떨어지게 하는 자연수를 빠짐없이 생각하세요.",
-      answers: ["2", "2개"],
+      id: "divisor-pairs",
+      prompt: "왼쪽 수가 오른쪽 수의 약수인 것을 모두 고르세요.",
+      context: "두 수를 나누어 나머지가 0인지 확인하세요.",
+      options: ["6과 42", "8과 30", "9와 54", "12와 50"],
+      answers: ["6과 42", "9와 54"],
+      multiple: true,
+      explanation: "42÷6=7, 54÷9=6으로 나누어떨어집니다. 8은 30의 약수가 아니고 12는 50의 약수가 아닙니다.",
+    },
+    {
+      id: "orange-bag-count",
+      prompt: "귤 28개를 여러 봉지에 남김없이 똑같이 나누어 담는 방법은 모두 몇 가지인가요?",
+      context: "봉지 수가 될 수 있는 28의 약수를 모두 찾아 개수를 세어 보세요.",
+      answers: ["6", "6가지"],
       shortAnswer: true,
-      explanation: "7의 약수는 1과 7이므로 모두 2개입니다.",
-    },
-    {
-      id: "missing-divisor-18",
-      prompt: "18 ÷ □ = 3입니다. □에 들어갈 수를 쓰세요.",
-      context: "나눗셈식을 이용해 18의 약수를 찾으세요.",
-      answers: ["6"],
-      shortAnswer: true,
-      explanation: "18÷6=3이므로 □는 6이고, 6은 18의 약수입니다.",
+      explanation: "28의 약수는 1, 2, 4, 7, 14, 28이므로 나누어 담는 방법은 6가지입니다.",
     },
   ],
   2: [
     {
-      id: "multiples-of-4",
-      prompt: "4의 배수를 작은 수부터 6개 차례로 쓴 것은?",
-      context: "4에 1, 2, 3, …을 차례로 곱해 확인하세요.",
-      options: ["4, 8, 12, 16, 20, 24", "1, 2, 4, 8, 12, 16", "4, 6, 8, 10, 12, 14"],
-      answers: ["4, 8, 12, 16, 20, 24"],
-      explanation: "4×1부터 4×6까지 계산하면 4, 8, 12, 16, 20, 24가 됩니다.",
+      id: "multiples-of-9",
+      prompt: "9의 배수를 가장 작은 수부터 차례로 5개 쓴 것은 어느 것인가요?",
+      context: "9에 1, 2, 3, 4, 5를 차례로 곱해 보세요.",
+      options: ["9, 18, 27, 36, 45", "9, 17, 25, 33, 41", "1, 3, 9, 18, 27"],
+      answers: ["9, 18, 27, 36, 45"],
+      explanation: "9×1부터 9×5까지 계산하면 9, 18, 27, 36, 45입니다.",
     },
     {
-      id: "factor-multiple-link",
-      prompt: "4 × 6 = 24에서 옳은 관계를 고르세요.",
-      context: "곱셈식은 약수와 배수의 관계를 함께 보여 줍니다.",
-      options: ["4와 6은 24의 약수이고, 24는 4와 6의 배수", "24는 4의 약수", "6은 24의 배수"],
-      answers: ["4와 6은 24의 약수이고, 24는 4와 6의 배수"],
-      explanation: "곱해서 24를 만드는 4와 6은 24의 약수이고, 24는 두 수의 배수입니다.",
+      id: "multiples-of-12",
+      prompt: "다음 수 중 12의 배수를 모두 고르세요.",
+      context: "각 수가 12×자연수로 나타내어지는지 확인하세요.",
+      options: ["24", "36", "50", "60", "84", "98"],
+      answers: ["24", "36", "60", "84"],
+      multiple: true,
+      explanation: "24=12×2, 36=12×3, 60=12×5, 84=12×7이므로 12의 배수입니다.",
     },
     {
-      id: "fifth-multiple-6",
-      prompt: "6의 다섯 번째 배수를 쓰세요.",
-      context: "6×1부터 차례로 세어 다섯 번째 값을 찾으세요.",
-      answers: ["30"],
+      id: "largest-two-digit-multiple",
+      prompt: "14의 배수 중 가장 큰 두 자리 수를 쓰세요.",
+      context: "14의 배수를 차례로 구해 100보다 작은 마지막 수를 찾으세요.",
+      answers: ["98"],
       shortAnswer: true,
-      explanation: "6×5=30이므로 6의 다섯 번째 배수는 30입니다.",
+      explanation: "14×7=98이고 14×8=112이므로 가장 큰 두 자리 배수는 98입니다.",
     },
     {
-      id: "multiple-product-8",
-      prompt: "8의 일곱 번째 배수를 쓰세요.",
-      context: "8에 7을 곱해 배수를 만드세요.",
-      answers: ["56"],
+      id: "bus-fifth-departure",
+      prompt: "버스가 오전 9시부터 18분 간격으로 출발합니다. 5번째 버스는 몇 시 몇 분에 출발하나요?",
+      context: "첫 버스가 오전 9시에 출발하므로 18분을 네 번 더해 보세요.",
+      answers: ["오전10시12분", "10시12분"],
       shortAnswer: true,
-      explanation: "8×7=56이므로 56은 8의 일곱 번째 배수입니다.",
+      explanation: "5번째 버스는 처음 출발한 뒤 18×4=72분 후이므로 오전 10시 12분에 출발합니다.",
     },
   ],
   3: [
     {
       id: "common-divisors",
-      prompt: "12와 18의 공약수를 모두 선택하세요.",
+      prompt: "18과 30의 공약수를 모두 고르세요.",
       context: "두 수를 모두 나누어떨어지게 하는 수만 선택해야 합니다.",
-      options: ["1", "2", "3", "4", "6", "9", "12"],
+      options: ["1", "2", "3", "5", "6", "9", "10", "15"],
       answers: ["1", "2", "3", "6"],
       multiple: true,
-      explanation: "1, 2, 3, 6은 12와 18을 모두 나누어떨어지게 하므로 공약수입니다.",
+      explanation: "18과 30을 모두 나누어떨어지게 하는 수는 1, 2, 3, 6입니다.",
     },
     {
       id: "greatest-common-divisor",
-      prompt: "12와 18의 최대공약수는?",
+      prompt: "18과 30의 최대공약수는 어느 것인가요?",
       context: "앞에서 찾은 공약수 중 가장 큰 수를 선택하세요.",
-      options: ["3", "6", "12", "18"],
+      options: ["2", "3", "6", "9"],
       answers: ["6"],
-      explanation: "공약수 1, 2, 3, 6 중 가장 큰 수는 6입니다.",
+      explanation: "18과 30의 공약수 1, 2, 3, 6 중 가장 큰 수는 6입니다.",
     },
     {
-      id: "gcd-16-24",
-      prompt: "16과 24의 최대공약수를 쓰세요.",
-      context: "두 수의 공약수 중 가장 큰 수를 찾으세요.",
-      answers: ["8"],
-      shortAnswer: true,
-      explanation: "16과 24의 공약수는 1, 2, 4, 8이고 최대공약수는 8입니다.",
+      id: "common-divisors-from-gcd",
+      prompt: "어떤 두 수의 최대공약수가 24입니다. 두 수의 공약수가 될 수 있는 수를 모두 고르세요.",
+      context: "두 수의 공약수는 최대공약수 24의 약수와 같습니다.",
+      options: ["3", "4", "6", "8", "10", "12"],
+      answers: ["3", "4", "6", "8", "12"],
+      multiple: true,
+      explanation: "3, 4, 6, 8, 12는 모두 24의 약수이므로 두 수의 공약수가 될 수 있습니다.",
     },
     {
       id: "common-divisor-count",
-      prompt: "최대공약수가 6일 때, 두 수의 공약수는 모두 몇 개일까요?",
-      context: "두 수의 공약수는 최대공약수의 약수와 같습니다.",
+      prompt: "42와 56의 공약수는 모두 몇 개인가요?",
+      context: "두 수의 최대공약수를 구한 뒤 그 수의 약수 개수를 세어 보세요.",
       answers: ["4", "4개"],
       shortAnswer: true,
-      explanation: "6의 약수는 1, 2, 3, 6이므로 공약수는 모두 4개입니다.",
+      explanation: "42와 56의 최대공약수는 14이고, 14의 약수는 1, 2, 7, 14이므로 공약수는 4개입니다.",
     },
   ],
   4: [
     {
+      id: "gcd-factorization",
+      prompt: "40=2×2×2×5, 60=2×2×3×5일 때 최대공약수를 구하는 식은 어느 것인가요?",
+      context: "두 곱셈식에 공통으로 들어 있는 수를 한 번씩 곱하세요.",
+      options: ["2×2×5=20", "2×2×2×3×5=120", "2×5=10"],
+      answers: ["2×2×5=20"],
+      explanation: "두 수에 공통으로 들어 있는 2, 2, 5를 곱하면 최대공약수는 20입니다.",
+    },
+    {
       id: "gcd-division-path",
-      prompt: "18과 24를 공약수로 계속 나눈 올바른 순서는?",
-      context: "두 수를 같은 공약수로 나누는 과정을 살펴보세요.",
-      options: ["18, 24 ÷ 2 → 9, 12 ÷ 3 → 3, 4", "18, 24 ÷ 3 → 6, 7", "18, 24 ÷ 4 → 4, 6"],
-      answers: ["18, 24 ÷ 2 → 9, 12 ÷ 3 → 3, 4"],
-      explanation: "먼저 2로, 이어서 3으로 두 수를 함께 나눌 수 있습니다.",
+      prompt: "42와 63을 공약수로 계속 나눈 올바른 과정은 어느 것인가요?",
+      context: "두 수를 같은 수로 나누어 몫이 서로소가 될 때까지 계산하세요.",
+      options: ["42, 63 ÷ 3 → 14, 21 ÷ 7 → 2, 3", "42, 63 ÷ 6 → 7, 10", "42, 63 ÷ 9 → 4, 7"],
+      answers: ["42, 63 ÷ 3 → 14, 21 ÷ 7 → 2, 3"],
+      explanation: "42와 63은 3으로 나눈 뒤 다시 7로 함께 나눌 수 있으므로 최대공약수는 3×7=21입니다.",
     },
     {
-      id: "gcd-product",
-      prompt: "공통으로 나눈 2와 3을 이용한 최대공약수는?",
-      context: "공통으로 나눈 수를 곱해 최대공약수를 완성하세요.",
-      options: ["2", "3", "5", "6"],
-      answers: ["6"],
-      explanation: "공통으로 나눈 수 2와 3을 곱한 6이 18과 24의 최대공약수입니다.",
-    },
-    {
-      id: "gcd-36-48",
-      prompt: "36과 48의 최대공약수를 쓰세요.",
+      id: "gcd-72-90",
+      prompt: "72와 90의 최대공약수를 쓰세요.",
       context: "두 수를 공약수로 계속 나누거나 공약수를 비교하세요.",
-      answers: ["12"],
+      answers: ["18"],
       shortAnswer: true,
-      explanation: "36과 48을 모두 나누는 가장 큰 수는 12입니다.",
+      explanation: "72와 90을 모두 나누어떨어지게 하는 가장 큰 수는 18입니다.",
     },
     {
-      id: "gcd-flower-bags",
-      prompt: "장미 24송이와 튤립 60송이를 남김없이 똑같이 나누어 최대한 많은 꽃병에 담으려 합니다. 꽃병은 몇 개 필요할까요?",
+      id: "gcd-sharing-students",
+      prompt: "떡 48개와 주스 60개를 최대한 많은 학생에게 남김없이 똑같이 나누어 주려고 합니다. 최대 몇 명에게 줄 수 있나요?",
       context: "두 수의 최대공약수를 생활 문제에 이용하세요.",
-      answers: ["12", "12개"],
+      answers: ["12", "12명"],
       shortAnswer: true,
-      explanation: "24와 60의 최대공약수는 12이므로 꽃병은 최대 12개입니다.",
+      explanation: "48과 60의 최대공약수는 12이므로 최대 12명에게 나누어 줄 수 있습니다.",
     },
   ],
   5: [
     {
       id: "common-multiples",
-      prompt: "50보다 작은 3과 5의 공배수를 모두 선택하세요.",
-      context: "3의 배수이면서 동시에 5의 배수인 수를 찾으세요.",
-      options: ["10", "15", "20", "30", "35", "45"],
-      answers: ["15", "30", "45"],
+      prompt: "100보다 작은 8과 12의 공배수를 모두 고르세요.",
+      context: "8의 배수이면서 동시에 12의 배수인 수를 찾으세요.",
+      options: ["16", "24", "36", "48", "72", "84", "96"],
+      answers: ["24", "48", "72", "96"],
       multiple: true,
-      explanation: "15, 30, 45는 모두 3과 5로 나누어떨어지는 공배수입니다.",
+      explanation: "8과 12의 공배수는 24의 배수이므로 100보다 작은 수는 24, 48, 72, 96입니다.",
     },
     {
       id: "least-common-multiple",
-      prompt: "3과 5의 최소공배수는?",
+      prompt: "8과 12의 최소공배수는 어느 것인가요?",
       context: "공배수 중 가장 작은 수가 최소공배수입니다.",
-      options: ["5", "10", "15", "30"],
-      answers: ["15"],
-      explanation: "공배수 15, 30, 45, … 중 가장 작은 수는 15입니다.",
+      options: ["12", "16", "24", "48"],
+      answers: ["24"],
+      explanation: "8과 12의 공배수 24, 48, 72, … 중 가장 작은 수는 24입니다.",
     },
     {
-      id: "lcm-4-6-concept",
-      prompt: "4와 6의 최소공배수를 쓰세요.",
-      context: "4의 배수와 6의 배수가 처음 만나는 수를 찾으세요.",
-      answers: ["12"],
-      shortAnswer: true,
-      explanation: "4의 배수 4, 8, 12와 6의 배수 6, 12가 처음 만나는 수는 12입니다.",
+      id: "common-multiples-from-lcm",
+      prompt: "어떤 두 수의 최소공배수가 18입니다. 두 수의 공배수를 모두 고르세요.",
+      context: "두 수의 공배수는 최소공배수 18의 배수입니다.",
+      options: ["18", "36", "45", "54", "72"],
+      answers: ["18", "36", "54", "72"],
+      multiple: true,
+      explanation: "18, 36, 54, 72는 18의 배수이므로 두 수의 공배수입니다. 45는 18의 배수가 아닙니다.",
     },
     {
-      id: "first-common-multiple-2-3",
-      prompt: "2와 3의 공배수 중 가장 작은 수를 쓰세요.",
-      context: "두 수의 배수 목록을 비교하세요.",
-      answers: ["6"],
+      id: "two-digit-common-multiple-count",
+      prompt: "6과 8의 공배수 중 두 자리 수는 모두 몇 개인가요?",
+      context: "6과 8의 최소공배수부터 두 자리 공배수를 차례로 써 보세요.",
+      answers: ["4", "4개"],
       shortAnswer: true,
-      explanation: "6은 2와 3의 첫 번째 공배수이므로 최소공배수입니다.",
+      explanation: "최소공배수는 24이고 두 자리 공배수는 24, 48, 72, 96이므로 4개입니다.",
     },
   ],
   6: [
     {
       id: "lcm-division-path",
-      prompt: "12와 20의 최소공배수 계산식으로 알맞은 것은?",
+      prompt: "18과 30의 최소공배수 계산식으로 알맞은 것은 어느 것인가요?",
       context: "두 수를 함께 나눈 수와 마지막에 남은 수를 모두 한 번씩 곱하세요.",
-      options: ["2 × 2 × 3 × 5 = 60", "2 × 2 = 4", "12 × 20 = 240"],
-      answers: ["2 × 2 × 3 × 5 = 60"],
-      explanation: "12와 20을 2, 2로 함께 나누고 남은 3과 5까지 곱하면 60입니다.",
+      options: ["2×3×3×5=90", "2×3=6", "18×30=540"],
+      answers: ["2×3×3×5=90"],
+      explanation: "18과 30을 2, 3으로 함께 나누고 남은 3과 5까지 곱하면 최소공배수는 90입니다.",
     },
     {
-      id: "lcm-check",
-      prompt: "12와 20이 처음으로 다시 만나는 배수는?",
-      context: "두 수의 최소공배수를 선택하세요.",
-      options: ["40", "60", "80", "120"],
-      answers: ["60"],
-      explanation: "60은 12×5이면서 20×3이고, 가장 작은 공배수입니다.",
-    },
-    {
-      id: "lcm-30-45",
-      prompt: "30과 45의 최소공배수를 쓰세요.",
-      context: "공약수로 나눈 수와 남은 몫을 모두 곱해 계산하세요.",
-      answers: ["90"],
+      id: "lcm-24-36",
+      prompt: "24와 36의 최소공배수를 쓰세요.",
+      context: "두 수를 공약수로 계속 나눈 수와 마지막 몫을 모두 곱하세요.",
+      answers: ["72"],
       shortAnswer: true,
-      explanation: "30과 45의 최소공배수는 90입니다.",
+      explanation: "72는 24×3이면서 36×2인 가장 작은 공배수입니다.",
+    },
+    {
+      id: "smallest-square-side",
+      prompt: "가로 12cm, 세로 18cm인 직사각형 종이를 겹치지 않게 이어 붙여 가장 작은 정사각형을 만들려고 합니다. 정사각형의 한 변은 몇 cm인가요?",
+      context: "12와 18의 공배수 중 가장 작은 수를 구하세요.",
+      answers: ["36", "36cm"],
+      shortAnswer: true,
+      explanation: "12와 18의 최소공배수는 36이므로 가장 작은 정사각형의 한 변은 36cm입니다.",
     },
     {
       id: "lighthouse-cycle",
-      prompt: "12초마다 켜지는 등대와 20초마다 켜지는 등대가 지금 함께 켜졌습니다. 다시 함께 켜지는 것은 몇 초 뒤일까요?",
+      prompt: "16초마다 켜지는 등대와 24초마다 켜지는 등대가 지금 함께 켜졌습니다. 다시 함께 켜지는 것은 몇 초 뒤인가요?",
       context: "두 등대 불빛이 켜지는 간격의 최소공배수를 구하세요.",
-      answers: ["60", "60초"],
+      answers: ["48", "48초"],
       shortAnswer: true,
-      explanation: "12와 20의 최소공배수는 60이므로 60초 뒤에 다시 함께 켜집니다.",
+      explanation: "16과 24의 최소공배수는 48이므로 48초 뒤에 다시 함께 켜집니다.",
     },
   ],
   7: [
     {
-      id: "relay-options",
-      prompt: "12 다음에 이어 쓸 수 있는 수를 모두 선택하세요.",
-      context: "다음 수는 12의 약수이거나 12의 배수여야 합니다.",
-      options: ["4", "5", "18", "24"],
-      answers: ["4", "24"],
+      id: "factor-multiple-pairs",
+      prompt: "두 수가 서로 약수와 배수의 관계인 것을 모두 고르세요.",
+      context: "큰 수가 작은 수로 나누어떨어지는지 확인하세요.",
+      options: ["6과 24", "8과 30", "9와 45", "14와 42"],
+      answers: ["6과 24", "9와 45", "14와 42"],
       multiple: true,
-      explanation: "4는 12의 약수이고 24는 12의 배수이므로 둘 다 이어 쓸 수 있습니다.",
+      explanation: "24=6×4, 45=9×5, 42=14×3이므로 세 쌍은 약수와 배수의 관계입니다.",
     },
     {
-      id: "relay-chain",
-      prompt: "같은 수를 두 번 쓰지 않고 완성한 이어달리기는?",
-      context: "앞 수와 다음 수가 매번 약수 또는 배수 관계인지 확인하세요.",
-      options: ["3 → 12 → 4 → 20", "3 → 12 → 5 → 20", "3 → 12 → 3 → 9"],
-      answers: ["3 → 12 → 4 → 20"],
-      explanation: "3→12는 배수, 12→4는 약수, 4→20은 배수 관계이고 같은 수를 반복하지 않았습니다.",
+      id: "factor-multiple-statements",
+      prompt: "7×8=56을 보고 옳게 설명한 것을 모두 고르세요.",
+      context: "곱셈식에서 곱하는 수는 곱의 약수이고, 곱은 두 수의 배수입니다.",
+      options: ["7과 8은 56의 약수", "56은 7과 8의 배수", "56은 7의 약수", "8은 56의 배수"],
+      answers: ["7과 8은 56의 약수", "56은 7과 8의 배수"],
+      multiple: true,
+      explanation: "7×8=56이므로 7과 8은 56의 약수이고 56은 7과 8의 배수입니다.",
     },
     {
-      id: "relay-multiple-count",
-      prompt: "이어달리기에서 4 다음에 20을 썼습니다. 20은 4의 몇 배일까요?",
-      context: "앞 수와 다음 수의 배수 관계를 계산하세요.",
-      answers: ["5", "5배"],
+      id: "multiples-below-100",
+      prompt: "100보다 작은 수 중에서 16의 배수는 모두 몇 개인가요?",
+      context: "16의 배수를 가장 작은 수부터 100보다 작을 때까지 써 보세요.",
+      answers: ["6", "6개"],
       shortAnswer: true,
-      explanation: "4×5=20이므로 20은 4의 5배입니다.",
+      explanation: "16, 32, 48, 64, 80, 96으로 모두 6개입니다.",
     },
     {
-      id: "relay-next-prime",
-      prompt: "7 다음에 이어 쓸 수 있는 7보다 큰 가장 작은 수를 쓰세요.",
-      context: "7의 약수 또는 배수이면서 아직 사용하지 않은 수를 찾으세요.",
-      answers: ["14"],
+      id: "bounded-divisor",
+      prompt: "어떤 수는 72의 약수이면서 16보다 크고 20보다 작습니다. 어떤 수인지 쓰세요.",
+      context: "72의 약수를 구한 뒤 주어진 범위에 있는 수를 찾으세요.",
+      answers: ["18"],
       shortAnswer: true,
-      explanation: "7보다 큰 7의 가장 작은 배수는 14이므로 이어 쓸 수 있습니다.",
+      explanation: "72의 약수 중 16보다 크고 20보다 작은 수는 18입니다.",
     },
   ],
   8: [
     {
-      id: "train-information",
-      prompt: "두 열차의 동시 도착 시간을 구할 때 꼭 필요한 정보는?",
-      context: "문제를 풀 때 꼭 필요한 내용을 고르세요.",
-      options: ["각 열차의 운행 간격과 처음 함께 출발한 시간", "열차의 색과 좌석 수", "역 사이의 거리만"],
-      answers: ["각 열차의 운행 간격과 처음 함께 출발한 시간"],
-      explanation: "두 운행 간격의 최소공배수와 기준이 되는 출발 시간이 필요합니다.",
+      id: "train-departure-time",
+      prompt: "12분 간격 열차와 18분 간격 열차가 오전 7시에 함께 출발했습니다. 다음에 함께 출발하는 시각은 언제인가요?",
+      context: "12와 18의 최소공배수를 구해 오전 7시에 더하세요.",
+      options: ["오전 7시 24분", "오전 7시 30분", "오전 7시 36분", "오전 7시 48분"],
+      answers: ["오전 7시 36분"],
+      explanation: "12와 18의 최소공배수는 36이므로 오전 7시 36분에 다시 함께 출발합니다.",
     },
     {
-      id: "train-lcm",
-      prompt: "12분과 18분 간격 열차가 7시에 함께 출발했습니다. 다시 만나는 때는?",
-      context: "12와 18의 최소공배수를 시간표에 이용하세요.",
-      options: ["7시 24분", "7시 30분", "7시 36분", "7시 48분"],
-      answers: ["7시 36분"],
-      explanation: "12와 18의 최소공배수는 36이므로 36분 뒤인 7시 36분에 다시 만납니다.",
-    },
-    {
-      id: "bus-cycle-8-12",
-      prompt: "8분마다 오는 버스와 12분마다 오는 버스가 지금 함께 도착했습니다. 다시 함께 도착하는 것은 몇 분 뒤일까요?",
-      context: "두 운행 간격의 최소공배수를 구하세요.",
-      answers: ["24", "24분"],
+      id: "traffic-light-cycle",
+      prompt: "한 신호등은 15초마다, 다른 신호등은 20초마다 켜집니다. 지금 함께 켜졌다면 몇 초 뒤에 다시 함께 켜지나요?",
+      context: "15와 20의 최소공배수를 구하세요.",
+      answers: ["60", "60초"],
       shortAnswer: true,
-      explanation: "8과 12의 최소공배수는 24이므로 24분 뒤에 다시 도착합니다.",
+      explanation: "15와 20의 최소공배수는 60이므로 60초 뒤에 다시 함께 켜집니다.",
     },
     {
-      id: "train-cycle-14-5",
-      prompt: "14분 간격 열차와 5분 간격 열차가 함께 출발했습니다. 다시 함께 출발하는 것은 몇 분 뒤일까요?",
-      context: "서로 공약수가 1인 두 수의 최소공배수를 구하세요.",
-      answers: ["70", "70분"],
+      id: "colored-dot-spacing",
+      prompt: "같은 점에서 시작해 검은 점은 8cm 간격, 빨간 점은 12cm 간격으로 찍습니다. 두 색 점은 몇 cm마다 함께 찍히나요?",
+      context: "8과 12의 최소공배수를 구하세요.",
+      answers: ["24", "24cm"],
       shortAnswer: true,
-      explanation: "14와 5의 최소공배수는 70이므로 70분 뒤에 다시 함께 출발합니다.",
+      explanation: "8과 12의 최소공배수는 24이므로 두 색 점은 24cm마다 함께 찍힙니다.",
+    },
+    {
+      id: "two-train-time",
+      prompt: "24분 간격 열차와 30분 간격 열차가 오후 2시에 함께 출발했습니다. 다음에 함께 출발하는 시각을 쓰세요.",
+      context: "24와 30의 최소공배수를 구해 오후 2시에 더하세요.",
+      answers: ["오후4시", "4시", "오후4시0분"],
+      shortAnswer: true,
+      explanation: "24와 30의 최소공배수는 120분이므로 2시간 뒤인 오후 4시에 다시 함께 출발합니다.",
     },
   ],
   9: [
     {
       id: "review-divisors",
-      prompt: "12의 약수를 모두 선택하세요.",
-      context: "12를 나머지 없이 나눌 수 있는 수를 찾으세요.",
-      options: ["1", "2", "3", "4", "5", "6", "12"],
-      answers: ["1", "2", "3", "4", "6", "12"],
+      prompt: "36의 약수를 모두 고르세요.",
+      context: "36을 나누어떨어지게 하는 수를 빠짐없이 찾으세요.",
+      options: ["1", "2", "3", "4", "6", "8", "9", "12", "18", "36"],
+      answers: ["1", "2", "3", "4", "6", "9", "12", "18", "36"],
       multiple: true,
-      explanation: "12를 나누어떨어지게 하는 수는 1, 2, 3, 4, 6, 12입니다.",
+      explanation: "36의 약수는 1, 2, 3, 4, 6, 9, 12, 18, 36입니다.",
     },
     {
-      id: "review-gcd",
-      prompt: "18과 24의 최대공약수는?",
-      context: "공약수 중 가장 큰 수를 선택하세요.",
-      options: ["3", "6", "9", "12"],
-      answers: ["6"],
-      explanation: "18과 24의 공약수 중 가장 큰 수는 6입니다.",
+      id: "review-fewest-divisors",
+      prompt: "약수가 가장 적은 수는 어느 것인가요?",
+      context: "각 수의 약수 개수를 비교하세요.",
+      options: ["13", "18", "25", "32"],
+      answers: ["13"],
+      explanation: "13의 약수는 1과 13뿐이므로 네 수 중 약수가 가장 적습니다.",
     },
     {
-      id: "review-lcm",
-      prompt: "14와 21의 최소공배수는?",
-      context: "공배수 중 가장 작은 수를 선택하세요.",
-      options: ["28", "35", "42", "84"],
-      answers: ["42"],
-      explanation: "42는 14×3이면서 21×2인 가장 작은 공배수입니다.",
+      id: "review-multiple-count",
+      prompt: "70보다 작은 수 중에서 11의 배수는 모두 몇 개인가요?",
+      context: "11의 배수를 가장 작은 수부터 70보다 작을 때까지 써 보세요.",
+      answers: ["6", "6개"],
+      shortAnswer: true,
+      explanation: "11, 22, 33, 44, 55, 66으로 모두 6개입니다.",
     },
     {
-      id: "review-life",
-      prompt: "4일마다와 6일마다 하는 활동이 오늘 겹쳤습니다. 다시 겹치는 것은 며칠 뒤일까요?",
-      context: "생활 속에서 되풀이되는 시간 문제에 최소공배수를 이용하세요.",
-      options: ["8일", "10일", "12일", "24일"],
-      answers: ["12일"],
-      explanation: "4와 6의 최소공배수는 12이므로 12일 뒤에 다시 겹칩니다.",
+      id: "review-factor-multiple-pairs",
+      prompt: "두 수가 약수와 배수의 관계인 것을 모두 고르세요.",
+      context: "큰 수가 작은 수로 나누어떨어지는지 확인하세요.",
+      options: ["5와 35", "12와 50", "18과 54", "24와 36"],
+      answers: ["5와 35", "18과 54"],
+      multiple: true,
+      explanation: "35=5×7, 54=18×3이므로 두 쌍이 약수와 배수의 관계입니다.",
     },
     {
       id: "review-gcd-short",
-      prompt: "40과 64의 최대공약수를 쓰세요.",
+      prompt: "48과 72의 최대공약수를 쓰세요.",
       context: "단원 확인 · 최대공약수 계산",
-      answers: ["8"],
+      answers: ["24"],
       shortAnswer: true,
-      explanation: "40과 64를 모두 나누는 가장 큰 수는 8입니다.",
-    },
-    {
-      id: "review-lcm-short",
-      prompt: "16과 24의 최소공배수를 쓰세요.",
-      context: "단원 확인 · 최소공배수 계산",
-      answers: ["48"],
-      shortAnswer: true,
-      explanation: "48은 16×3이면서 24×2인 가장 작은 공배수입니다.",
+      explanation: "48과 72를 모두 나누는 가장 큰 수는 24입니다.",
     },
     {
       id: "review-sharing-short",
-      prompt: "색종이 40장과 도화지 64장을 남김없이 똑같이 나누어 최대한 많은 꾸러미를 만들면 몇 꾸러미일까요?",
+      prompt: "쿠키 54개와 사탕 72개를 최대한 많은 학생에게 남김없이 똑같이 나누어 주려고 합니다. 최대 몇 명에게 줄 수 있나요?",
       context: "단원 확인 · 최대공약수 생활 문제",
-      answers: ["8", "8꾸러미", "8개"],
+      answers: ["18", "18명"],
       shortAnswer: true,
-      explanation: "40과 64의 최대공약수가 8이므로 최대 8꾸러미를 만들 수 있습니다.",
+      explanation: "54와 72의 최대공약수는 18이므로 최대 18명에게 나누어 줄 수 있습니다.",
+    },
+    {
+      id: "review-lcm-short",
+      prompt: "14와 20의 최소공배수를 쓰세요.",
+      context: "단원 확인 · 최소공배수 계산",
+      answers: ["140"],
+      shortAnswer: true,
+      explanation: "140은 14×10이면서 20×7인 가장 작은 공배수입니다.",
     },
     {
       id: "review-cycle-short",
-      prompt: "10일마다와 15일마다 하는 활동이 오늘 겹쳤습니다. 다시 겹치는 것은 며칠 뒤일까요?",
+      prompt: "8일마다와 12일마다 하는 활동이 오늘 겹쳤습니다. 다시 겹치는 것은 며칠 뒤인가요?",
       context: "단원 확인 · 최소공배수 생활 문제",
-      answers: ["30", "30일"],
+      answers: ["24", "24일"],
       shortAnswer: true,
-      explanation: "10과 15의 최소공배수는 30이므로 30일 뒤에 다시 겹칩니다.",
+      explanation: "8과 12의 최소공배수는 24이므로 24일 뒤에 다시 겹칩니다.",
     },
   ],
   10: [
     {
       id: "boss-divisor",
-      prompt: "보스 숫자 18의 약수를 모두 찾으세요.",
+      prompt: "42의 약수를 모두 고르세요.",
       context: "첫 번째 보스 문제 · 약수",
-      options: ["1", "2", "3", "4", "6", "9", "18"],
-      answers: ["1", "2", "3", "6", "9", "18"],
+      options: ["1", "2", "3", "6", "7", "12", "14", "21", "42"],
+      answers: ["1", "2", "3", "6", "7", "14", "21", "42"],
       multiple: true,
-      explanation: "18은 1, 2, 3, 6, 9, 18로 나누어떨어집니다.",
+      explanation: "42의 약수는 1, 2, 3, 6, 7, 14, 21, 42입니다.",
     },
     {
       id: "boss-multiple",
-      prompt: "보스 숫자 6의 배수만 모두 선택하세요.",
-      context: "두 번째 보스 문제 · 배수",
-      options: ["12", "18", "20", "24"],
-      answers: ["12", "18", "24"],
+      prompt: "45의 약수가 아닌 것은 어느 것인가요?",
+      context: "두 번째 보스 문제 · 약수 판별",
+      options: ["1", "3", "5", "9", "15", "20", "45"],
+      answers: ["20"],
+      explanation: "45는 20으로 나누어떨어지지 않으므로 20은 45의 약수가 아닙니다.",
+    },
+    {
+      id: "boss-multiple-selection",
+      prompt: "다음 수 중 9의 배수를 모두 고르세요.",
+      context: "세 번째 보스 문제 · 배수 판별",
+      options: ["18", "27", "40", "54", "72", "81", "100"],
+      answers: ["18", "27", "54", "72", "81"],
       multiple: true,
-      explanation: "12, 18, 24는 각각 6×2, 6×3, 6×4입니다.",
+      explanation: "18, 27, 54, 72, 81은 각각 9에 자연수를 곱해 만들 수 있습니다.",
     },
     {
-      id: "boss-gcd",
-      prompt: "24와 36의 최대공약수는?",
-      context: "세 번째 보스 문제 · 최대공약수",
-      options: ["6", "8", "12", "18"],
-      answers: ["12"],
-      explanation: "24와 36을 모두 나누는 가장 큰 수는 12입니다.",
+      id: "boss-relation-statements",
+      prompt: "6×8=48을 보고 옳게 설명한 것을 모두 고르세요.",
+      context: "네 번째 보스 문제 · 약수와 배수의 관계",
+      options: ["6과 8은 48의 약수", "48은 6과 8의 배수", "48은 6의 약수", "8은 48의 배수"],
+      answers: ["6과 8은 48의 약수", "48은 6과 8의 배수"],
+      multiple: true,
+      explanation: "6×8=48이므로 6과 8은 48의 약수이고, 48은 두 수의 배수입니다.",
     },
     {
-      id: "boss-lcm",
-      prompt: "8과 12의 최소공배수는?",
-      context: "네 번째 보스 문제 · 최소공배수",
-      options: ["16", "20", "24", "48"],
-      answers: ["24"],
-      explanation: "24는 8×3이면서 12×2인 가장 작은 공배수입니다.",
-    },
-    {
-      id: "boss-life",
-      prompt: "15분마다와 20분마다 되풀이되는 일이 동시에 시작했습니다. 다시 겹치는 것은 몇 분 뒤일까요?",
-      context: "다섯 번째 보스 문제 · 반복되는 시간",
-      options: ["30분", "40분", "60분", "300분"],
-      answers: ["60분"],
-      explanation: "15와 20의 최소공배수는 60이므로 60분 뒤에 다시 겹칩니다.",
-    },
-    {
-      id: "boss-divisor-count-short",
-      prompt: "24의 약수는 모두 몇 개일까요?",
-      context: "여섯 번째 보스 문제 · 약수 모두 찾기",
-      answers: ["8", "8개"],
-      shortAnswer: true,
-      explanation: "24의 약수는 1, 2, 3, 4, 6, 8, 12, 24로 모두 8개입니다.",
-    },
-    {
-      id: "boss-multiple-short",
-      prompt: "7의 다섯 번째 배수를 쓰세요.",
-      context: "일곱 번째 보스 문제 · 배수 만들기",
-      answers: ["35"],
-      shortAnswer: true,
-      explanation: "7×5=35이므로 7의 다섯 번째 배수는 35입니다.",
+      id: "boss-common-divisors",
+      prompt: "24와 40의 공약수를 모두 고르세요.",
+      context: "다섯 번째 보스 문제 · 공약수",
+      options: ["1", "2", "3", "4", "5", "8", "10", "12"],
+      answers: ["1", "2", "4", "8"],
+      multiple: true,
+      explanation: "24와 40을 모두 나누어떨어지게 하는 수는 1, 2, 4, 8입니다.",
     },
     {
       id: "boss-gcd-short",
-      prompt: "30과 45의 최대공약수를 쓰세요.",
-      context: "여덟 번째 보스 문제 · 최대공약수 계산",
-      answers: ["15"],
+      prompt: "84와 126의 최대공약수를 쓰세요.",
+      context: "여섯 번째 보스 문제 · 최대공약수 계산",
+      answers: ["42"],
       shortAnswer: true,
-      explanation: "30과 45를 모두 나누는 가장 큰 수는 15입니다.",
+      explanation: "84와 126을 모두 나누어떨어지게 하는 가장 큰 수는 42입니다.",
     },
     {
       id: "boss-lcm-short",
-      prompt: "18과 24의 최소공배수를 쓰세요.",
-      context: "마지막 보스 문제 · 최소공배수 계산",
-      answers: ["72"],
+      prompt: "15와 18의 최소공배수를 쓰세요.",
+      context: "일곱 번째 보스 문제 · 최소공배수 계산",
+      answers: ["90"],
       shortAnswer: true,
-      explanation: "72는 18×4이면서 24×3인 가장 작은 공배수입니다.",
+      explanation: "90은 15×6이면서 18×5인 가장 작은 공배수입니다.",
+    },
+    {
+      id: "boss-square-short",
+      prompt: "가로 20cm, 세로 30cm인 직사각형 종이를 이어 붙여 가장 작은 정사각형을 만들 때 한 변은 몇 cm인가요?",
+      context: "여덟 번째 보스 문제 · 최소공배수 생활 문제",
+      answers: ["60", "60cm"],
+      shortAnswer: true,
+      explanation: "20과 30의 최소공배수는 60이므로 정사각형의 한 변은 60cm입니다.",
+    },
+    {
+      id: "boss-cycle-short",
+      prompt: "기계 ㉮는 18일마다, 기계 ㉯는 24일마다 점검합니다. 오늘 함께 점검했다면 다음에 함께 점검하는 것은 며칠 뒤인가요?",
+      context: "마지막 보스 문제 · 최소공배수 생활 문제",
+      answers: ["72", "72일"],
+      shortAnswer: true,
+      explanation: "18과 24의 최소공배수는 72이므로 72일 뒤에 다시 함께 점검합니다.",
     },
   ],
 };
@@ -688,7 +700,16 @@ export type StoryBattle = {
   bossHp: number;
   bossMaxHp: number;
   bossPhase: number;
+  bossTurn: number;
 };
+
+export type StoryBattleOutcome = "clear" | "failed" | null;
+
+export function getStoryBattleOutcome(battle: StoryBattle): StoryBattleOutcome {
+  if (!battle.board.includes(2)) return "clear";
+  if (!battle.board.includes(1) || !battle.board.includes(0)) return "failed";
+  return null;
+}
 
 const PLAYER_POSITIONS = [0, 48, 42, 6];
 const ENEMY_POSITIONS = [16, 18, 24, 30, 32, 10, 38, 20, 28, 34];
@@ -722,6 +743,7 @@ export function createStoryBattle(stage: StoryStage, size: BoardSize = 7): Story
     bossHp: stage.boss?.hp ?? 0,
     bossMaxHp: stage.boss?.hp ?? 0,
     bossPhase: 0,
+    bossTurn: 0,
   };
 }
 
@@ -833,7 +855,12 @@ export function applyStoryMove(
 }
 
 export function chooseStoryAiMove(battle: StoryBattle, stage: StoryStage): { move: Move; mode: StoryMode } | null {
-  const moves = legalMoves(battle.board, 2);
+  const livingBossIndex = stage.boss && battle.bossHp > 0 ? battle.bossIndex : null;
+  const availableMoves = legalMoves(battle.board, 2)
+    .filter((move) => move.from !== livingBossIndex);
+  const moves = stage.enemyMovement === "jump-only"
+    ? availableMoves.filter((move) => move.distance === 2)
+    : availableMoves;
   if (!moves.length) return null;
   const modes = stage.modes.filter((mode) => mode !== "split") as StoryMode[];
   const candidateModes: StoryMode[] = modes.length ? modes : ["divisor"];
@@ -913,35 +940,56 @@ export function applyEmergencyTreatment(battle: StoryBattle, stage: StoryStage):
   return null;
 }
 
-export function applyBossPulse(battle: StoryBattle, stage: StoryStage): StoryMoveResult {
+export function applyBossTurn(battle: StoryBattle, stage: StoryStage): StoryMoveResult {
   if (!stage.boss || battle.bossIndex === null || battle.bossHp <= 0) {
     return { ...battle, infected: [], resisted: [], relationText: "", bossHit: false };
   }
   const board = [...battle.board];
   const numbers = [...battle.numbers];
+  const bossTurn = battle.bossTurn + 1;
   const bossPhase = (battle.bossPhase + 1) % stage.boss.sequence.length;
   const bossNumber = stage.boss.sequence[bossPhase];
   numbers[battle.bossIndex] = bossNumber;
-  const candidates = board
-    .map((cell, index) => ({ cell, index, number: numbers[index] ?? 1 }))
-    .filter(({ cell, number }) => cell === 1 && (isRelation(bossNumber, number, "divisor") || isRelation(bossNumber, number, "multiple")));
-  const victim = candidates[Math.floor(Math.random() * candidates.length)];
-  const infected: number[] = [];
-  if (victim) {
-    board[victim.index] = 2;
-    numbers[victim.index] = bossNumber;
-    infected.push(victim.index);
+
+  if (bossTurn % 2 === 0) {
+    const base = { ...battle, board, numbers, bossPhase, bossTurn };
+    const moves = legalMoves(board, 2)
+      .filter((move) => move.from === battle.bossIndex && move.distance === 1);
+    const modes = stage.modes.filter((mode) => mode !== "split") as StoryMode[];
+    const candidateModes: StoryMode[] = modes.length ? modes : ["divisor"];
+    const scored = moves.flatMap((move) => candidateModes.map((mode) => {
+      const preview = applyStoryMove(base, stage, 2, move, mode);
+      return { move, mode, value: preview.infected.length * 12 + Math.random() * 2 };
+    })).sort((left, right) => right.value - left.value);
+    const action = scored[0];
+
+    if (action) {
+      const moved = applyStoryMove(base, stage, 2, action.move, action.mode);
+      moved.numbers[action.move.to] = bossNumber;
+      return {
+        ...moved,
+        bossIndex: action.move.to,
+        bossPhase,
+        bossTurn,
+        relationText: moved.infected.length
+          ? `보스가 질병 세균을 남기고 한 칸 복제 이동해 치료 세균 ${moved.infected.length}개를 감염시켰어요.`
+          : "보스가 질병 세균을 남기고 인접한 칸으로 복제 이동했어요.",
+        bossHit: false,
+      };
+    }
   }
+
   return {
     ...battle,
     board,
     numbers,
     bossPhase,
-    infected,
+    bossTurn,
+    infected: [],
     resisted: [],
-    relationText: victim
-      ? `보스가 숫자를 ${bossNumber}(으)로 바꾸고 치료 세균 1개를 질병 세균으로 만들었어요!`
-      : `보스가 숫자를 ${bossNumber}(으)로 바꾸었지만 공격할 치료 세균은 없었어요.`,
+    relationText: bossTurn % 2 === 0
+      ? `보스가 ${bossNumber}(으)로 수를 바꾸었지만 복제할 빈칸을 찾지 못했어요.`
+      : `보스가 ${bossNumber}(으)로 수를 바꾸고 다음 턴의 복제 이동을 준비해요.`,
     bossHit: false,
   };
 }

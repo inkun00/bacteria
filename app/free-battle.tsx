@@ -106,7 +106,7 @@ function Germ({
   mode?: RelationMode;
 }) {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const sprite = infection ? "bacteria-infection.png" : "bacteria-idle.png";
+  const sprite = infection ? "bacteria-infection.webp" : "bacteria-idle.webp";
 
   return (
     <span
@@ -167,7 +167,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const animationWatchdog = useRef<number | null>(null);
 
   useEffect(() => {
-    try {
+    const restoreFrame = window.requestAnimationFrame(() => {
+      try {
       const raw = window.sessionStorage.getItem(SAVED_GAME_KEY);
       const saved = raw ? JSON.parse(raw) as Partial<SavedGame> : null;
       const savedSize = Array.isArray(saved?.board) ? Math.sqrt(saved.board.length) : 0;
@@ -201,11 +202,13 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
           setRestartPromptOpen(true);
         }
       }
-    } catch {
-      window.sessionStorage.removeItem(SAVED_GAME_KEY);
-    } finally {
-      setHydrated(true);
-    }
+      } catch {
+        window.sessionStorage.removeItem(SAVED_GAME_KEY);
+      } finally {
+        setHydrated(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(restoreFrame);
   }, []);
 
   const clearSequenceTimers = useCallback(() => {
@@ -429,6 +432,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     }
   }, [animating, board, bombCharge, bombs, captures, clearSequenceTimers, currentPlayer, gameOver, moveNumber, numbers, playTone, relationMode, resolveEnd, restartPromptOpen, schedule]);
 
+  // AI turn orchestration mirrors the timer lifecycle in visible UI state.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (setupOpen || restartPromptOpen || gameOver || animating || settings.mode !== "ai" || currentPlayer !== 2) {
       setThinking(false);
@@ -470,6 +475,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       window.clearTimeout(moveTimer);
     };
   }, [animating, board, bombs, currentPlayer, executeMove, gameOver, numbers, playTone, resolveEnd, restartPromptOpen, settings, setupOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => () => clearSequenceTimers(), [clearSequenceTimers]);
 
@@ -616,7 +622,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       <header className="topbar">
         <button className="brand" onClick={onExit} aria-label="게임 시작 화면으로 돌아가기">
           <span className="brand-mark"><i /><i /><i /></span>
-          <span><strong>페트리</strong><small>// 07</small></span>
+          <span><strong>페트리</strong><small>{"// 07"}</small></span>
         </button>
         <div className="topbar-center">
           <span className="live-dot" />
@@ -860,8 +866,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       )}
 
       {rulesOpen && (
-        <div className="drawer-backdrop" onClick={() => setRulesOpen(false)}>
-          <aside className="rules-drawer" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="rules-title">
+        <div className="drawer-backdrop">
+          <aside className="rules-drawer" role="dialog" aria-modal="true" aria-labelledby="rules-title">
             <button className="drawer-close" onClick={() => setRulesOpen(false)} aria-label="규칙 닫기">×</button>
             <span className="drawer-kicker">게임 설명 // 01</span>
             <h2 id="rules-title">게임 방법</h2>
@@ -898,7 +904,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                   : "지금까지 한 내용을 지우고 같은 설정으로 새 게임을 시작해요."}
             </p>
             <div>
-              <button className="continue-game" autoFocus onClick={() => setRestartPromptOpen(false)}>이어서 하기</button>
+              <button className="continue-game" onClick={() => setRestartPromptOpen(false)}>이어서 하기</button>
               <button className="confirm-restart" onClick={() => startGame(settings)}>다시 시작</button>
             </div>
           </section>

@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Cinematic assets are pre-optimized WebP files and must swap instantly without a runtime image service. */
+
 export const dynamic = "force-static";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -10,11 +12,12 @@ import {
   MODE_COPY,
   STAGE_LEARNING_TASKS,
   STORY_STAGES,
-  applyBossPulse,
+  applyBossTurn,
   applyEmergencyTreatment,
   applyStoryMove,
   chooseStoryAiMove,
   createStoryBattle,
+  getStoryBattleOutcome,
   isLearningAnswerCorrect,
   type LearningTask,
   type StoryBattle,
@@ -25,6 +28,18 @@ const STORY_SAVE_KEY = "factor-force-story-progress-v2";
 const LEGACY_STORY_SAVE_KEY = "factor-force-story-progress-v1";
 const STORY_STAGE_COUNT = STORY_STAGES.length;
 const BOSS_STAGE_ID = STORY_STAGES[STORY_STAGE_COUNT - 1].id;
+const MUSIC_TRACKS = {
+  menu: "/assets/audio/space-battle.ogg",
+  mission: "/assets/audio/mission-pulse.mp3",
+  opening: "/assets/audio/opening-suspense.ogg",
+  ending: "/assets/audio/ending-revelation.mp3",
+} as const;
+const RESULT_SOUNDS = {
+  clear: "/assets/audio/stage-clear.mp3",
+  failed: "/assets/audio/stage-failed.mp3",
+  bossClear: "/assets/audio/boss-clear.wav",
+  bossDefeat: "/assets/audio/boss-defeat.mp3",
+} as const;
 
 const OPENING_CAPTIONS = [
   "2042년, 숫자를 바꾸며 빠르게 늘어나는 질병 세균이 지구 곳곳에 나타났다.",
@@ -38,10 +53,14 @@ const OPENING_CAPTIONS = [
 ];
 
 const ENDING_CAPTIONS = [
-  "마지막 치료 빛이 우두머리 세균의 숫자 방어막을 무너뜨렸다.",
-  "남아 있던 질병 세균은 모두 치료 세균으로 바뀌었다.",
-  "세균에서 벗어난 대륙에 생명이 돌아오고, 지구는 다시 푸르게 빛났다.",
-  "임무 완료. 약수와 배수로 지켜 낸 우리의 행성에 평화가 찾아왔다.",
+  "태평양 무인도에서 마지막 치료 빛이 보스를 향했지만, 그 힘만으로는 아직 부족했습니다.",
+  "그때 세계 곳곳의 연구소와 학교, 병원과 가정에서 사람들이 동시에 숫자의 규칙을 풀기 시작했습니다.",
+  "서로 다른 언어와 시간 속에서도 모두가 답을 나누며 치료 에너지를 지구 한 바퀴로 이어 보냈습니다.",
+  "수많은 사람의 지혜와 용기가 하나의 푸른 빛이 되어 무인도에 모였습니다.",
+  "마침내 보스 세균의 붉은 장벽이 무너지고, 거대한 몸은 해로운 힘을 잃은 빛으로 흩어졌습니다.",
+  "보스가 사라지자 전 세계의 질병 세균도 차례로 치료 세균으로 되돌아왔습니다.",
+  "사람들은 함께 도시와 학교, 숲과 바다를 다시 돌보며 평화로운 일상을 되찾았습니다.",
+  "전 세계가 힘을 합쳐 지켜 낸 지구. 약수와 배수로 이어진 우리의 연대는 새로운 평화를 밝혔습니다.",
 ];
 
 type View = "title" | "map" | "battle" | "free";
@@ -90,6 +109,21 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainder}`;
 }
 
+function AudioToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <button
+      className={`audio-toggle ${enabled ? "on" : "off"}`}
+      type="button"
+      aria-pressed={enabled}
+      aria-label={enabled ? "배경음악과 효과음 끄기" : "배경음악과 효과음 켜기"}
+      onClick={onToggle}
+    >
+      <span aria-hidden="true">{enabled ? "♪" : "×"}</span>
+      <b>{enabled ? "소리 켜짐" : "소리 꺼짐"}</b>
+    </button>
+  );
+}
+
 function Germ({
   player,
   infection = false,
@@ -105,7 +139,7 @@ function Germ({
 }) {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const storyDisease = player === 2 && !infection;
-  const sprite = infection ? "bacteria-infection.png" : storyDisease ? "story-disease-germ-idle.png" : "bacteria-idle.png";
+  const sprite = boss ? "boss-germ-sprite.webp" : infection ? "bacteria-infection.webp" : storyDisease ? "story-disease-germ-idle.webp" : "bacteria-idle.webp";
   return (
     <span
       className={`germ-sprite p${player} ${infection ? "infection" : "idle"} ${storyDisease ? "story-disease" : ""} ${boss ? "boss" : ""}`}
@@ -122,7 +156,14 @@ function TitleScreen({ onStory, onFree }: { onStory: () => void; onFree: () => v
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   return (
     <main className="title-screen">
-      <img className="title-hero-image" src={`${basePath}/assets/story/opening.png`} alt="숫자 질병 세균의 확산에 맞서는 치료 세균 지구 방어대" />
+      <img
+        className="title-hero-image"
+        src={`${basePath}/assets/story/opening.webp`}
+        alt="숫자 질병 세균의 확산에 맞서는 치료 세균 지구 방어대"
+        loading="eager"
+        fetchPriority="high"
+        decoding="async"
+      />
       <div className="title-vignette" />
       <div className="title-grid" aria-hidden="true" />
       <section className="title-content">
@@ -157,22 +198,31 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const sceneImages = kind === "opening"
     ? [
-      "opening-01.png",
-      "opening-bridge-01.png",
-      "opening-02.png",
-      "opening-bridge-02.png",
-      "opening-03.png",
-      "opening-bridge-03.png",
-      "opening-04.png",
-      "opening-bridge-04.png",
+      "opening-01.webp",
+      "opening-bridge-01.webp",
+      "opening-02.webp",
+      "opening-bridge-02.webp",
+      "opening-03.webp",
+      "opening-bridge-03.webp",
+      "opening-04.webp",
+      "opening-bridge-04.webp",
     ]
-    : ["ending.png"];
+    : [
+      "ending-01.webp",
+      "ending-02.webp",
+      "ending-03.webp",
+      "ending-04.webp",
+      "ending-05.webp",
+      "ending-06.webp",
+      "ending-07.webp",
+      "ending-08.webp",
+    ];
   const sceneImage = sceneImages[Math.min(captionIndex, sceneImages.length - 1)];
 
   useEffect(() => {
     const sceneDuration = kind === "opening"
       ? captionIndex === 0 ? 6400 : 5600
-      : captionIndex === 0 ? 3200 : 2800;
+      : captionIndex === 0 ? 5400 : captionIndex === captions.length - 1 ? 6200 : 4800;
     const timer = window.setTimeout(() => {
       if (captionIndex < captions.length - 1) setCaptionIndex((value) => value + 1);
       else onFinish();
@@ -182,7 +232,14 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
 
   return (
     <div className="cinematic" role="dialog" aria-modal="true" aria-label={kind === "opening" ? "오프닝" : "엔딩"}>
-      <img className={kind === "opening" ? "opening-scene" : ""} key={`${kind}-${captionIndex}`} src={`${basePath}/assets/story/${sceneImage}`} alt="" />
+      <img
+        className={kind === "opening" ? "opening-scene" : ""}
+        key={`${kind}-${captionIndex}`}
+        src={`${basePath}/assets/story/${sceneImage}`}
+        alt=""
+        loading="eager"
+        decoding="async"
+      />
       <div className="cinematic-vignette" />
       <div className="cinematic-topline">
         <span>{kind === "opening" ? "FACTOR FORCE · 이야기 시작" : "FACTOR FORCE · 이야기 끝"}</span>
@@ -383,6 +440,7 @@ function BattleBoard({
   hovered,
   flash,
   shot,
+  bossDefeatCell,
   relationMode,
   disabled,
   onCell,
@@ -393,17 +451,19 @@ function BattleBoard({
   hovered: number | null;
   flash: { infected: number[]; resisted: number[] };
   shot: { from: number; targets: number[]; player: 1 | 2 } | null;
+  bossDefeatCell: number | null;
   relationMode: RelationMode;
   disabled: boolean;
   onCell: (index: number) => void;
   onHover: (index: number | null) => void;
 }) {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const targets = useMemo(() => new Set(
     selected === null ? [] : legalMoves(battle.board, 1).filter((move) => move.from === selected).map((move) => move.to),
   ), [battle.board, selected]);
 
   return (
-    <div className="petri-board-grid" role="grid" aria-label="7 × 7 세균전 게임판">
+    <div className={`petri-board-grid ${bossDefeatCell !== null ? "boss-defeating" : ""}`} role="grid" aria-label="7 × 7 세균전 게임판">
       {battle.board.map((cell, index) => {
         const number = battle.numbers[index];
         const isBoss = battle.bossIndex === index && battle.bossHp > 0;
@@ -461,6 +521,37 @@ function BattleBoard({
           })}
         </div>
       )}
+      {bossDefeatCell !== null && (
+        <div
+          className="boss-defeat-effect"
+          role="status"
+          aria-label="보스 세균이 붕괴했습니다"
+          style={{
+            "--boss-x": `${(((bossDefeatCell % 7) + .5) / 7) * 100}%`,
+            "--boss-y": `${((Math.floor(bossDefeatCell / 7) + .5) / 7) * 100}%`,
+            "--boss-image": `url("${basePath}/assets/boss-germ-sprite.webp")`,
+          } as CSSProperties}
+        >
+          <span className="boss-defeat-core" aria-hidden="true">
+            <i className="boss-defeat-sprite" />
+            <i className="boss-defeat-flash" />
+            <i className="boss-defeat-ring ring-one" />
+            <i className="boss-defeat-ring ring-two" />
+            {Array.from({ length: 16 }, (_, index) => (
+              <i
+                className="boss-defeat-particle"
+                key={index}
+                style={{
+                  "--particle-angle": `${index * 22.5}deg`,
+                  "--particle-distance": `${58 + (index % 4) * 12}px`,
+                  "--particle-delay": `${620 + (index % 5) * 55}ms`,
+                } as CSSProperties}
+              />
+            ))}
+          </span>
+          <strong aria-hidden="true">보스 세균 붕괴</strong>
+        </div>
+      )}
     </div>
   );
 }
@@ -483,22 +574,121 @@ export default function Home() {
   const [moveCount, setMoveCount] = useState(0);
   const [battleElapsed, setBattleElapsed] = useState(0);
   const [result, setResult] = useState<BattleResult>(null);
+  const [bossDefeatCell, setBossDefeatCell] = useState<number | null>(null);
   const [cinematic, setCinematic] = useState<CinematicKind | null>(null);
   const [freeBattle, setFreeBattle] = useState(false);
   const [learningGate, setLearningGate] = useState<LearningGateState | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const timers = useRef<number[]>([]);
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
+  const resultSfxRef = useRef<Record<keyof typeof RESULT_SOUNDS, HTMLAudioElement> | null>(null);
+  const soundEnabledRef = useRef(true);
 
   const selectedStage = STORY_STAGES[selectedStageId - 1];
   const battleStage = STORY_STAGES[battleStageId - 1];
   const unlocked = Math.min(STORY_STAGE_COUNT, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
 
   useEffect(() => {
-    const progress = loadProgress();
-    setCompleted(progress);
-    setSelectedStageId(Math.min(STORY_STAGE_COUNT, Math.max(1, progress.length ? Math.max(...progress) + 1 : 1)));
-    setHydrated(true);
-    return () => timers.current.forEach((timer) => window.clearTimeout(timer));
+    const restoreFrame = window.requestAnimationFrame(() => {
+      const progress = loadProgress();
+      setCompleted(progress);
+      setSelectedStageId(Math.min(STORY_STAGE_COUNT, Math.max(1, progress.length ? Math.max(...progress) + 1 : 1)));
+      setHydrated(true);
+    });
+    return () => {
+      window.cancelAnimationFrame(restoreFrame);
+      timers.current.forEach((timer) => window.clearTimeout(timer));
+    };
   }, []);
+
+  useEffect(() => {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    const bgm = new Audio(`${basePath}${MUSIC_TRACKS.menu}`);
+    const infectionSfx = new Audio(`${basePath}/assets/audio/infection-splat.wav`);
+    const resultSounds = {
+      clear: new Audio(`${basePath}${RESULT_SOUNDS.clear}`),
+      failed: new Audio(`${basePath}${RESULT_SOUNDS.failed}`),
+      bossClear: new Audio(`${basePath}${RESULT_SOUNDS.bossClear}`),
+      bossDefeat: new Audio(`${basePath}${RESULT_SOUNDS.bossDefeat}`),
+    };
+    bgm.loop = true;
+    bgm.preload = "metadata";
+    bgm.volume = 0.18;
+    infectionSfx.volume = 0.56;
+    resultSounds.clear.volume = 0.55;
+    resultSounds.failed.volume = 0.48;
+    resultSounds.bossClear.volume = 0.62;
+    resultSounds.bossDefeat.volume = 0.68;
+    infectionSfx.preload = "none";
+    Object.values(resultSounds).forEach((sound) => { sound.preload = "none"; });
+    bgmRef.current = bgm;
+    infectionSfxRef.current = infectionSfx;
+    resultSfxRef.current = resultSounds;
+
+    const startMusic = () => {
+      if (soundEnabledRef.current) bgm.play().catch(() => undefined);
+    };
+    window.addEventListener("pointerdown", startMusic, { once: true });
+    window.addEventListener("keydown", startMusic, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", startMusic);
+      window.removeEventListener("keydown", startMusic);
+      bgm.pause();
+      infectionSfx.pause();
+      Object.values(resultSounds).forEach((sound) => sound.pause());
+      bgmRef.current = null;
+      infectionSfxRef.current = null;
+      resultSfxRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const bgm = bgmRef.current;
+    if (!bgm) return;
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    const isMissionView = view === "battle" || view === "free";
+    const track = cinematic === "opening"
+      ? MUSIC_TRACKS.opening
+      : cinematic === "ending"
+        ? MUSIC_TRACKS.ending
+        : isMissionView
+          ? MUSIC_TRACKS.mission
+          : MUSIC_TRACKS.menu;
+    const nextSource = `${basePath}${track}`;
+    if (bgm.getAttribute("src") === nextSource) return;
+
+    bgm.pause();
+    bgm.src = nextSource;
+    bgm.currentTime = 0;
+    bgm.loop = true;
+    bgm.volume = cinematic === "opening" ? 0.22 : cinematic === "ending" ? 0.2 : isMissionView ? 0.14 : 0.18;
+    bgm.load();
+    if (soundEnabledRef.current) bgm.play().catch(() => undefined);
+  }, [cinematic, view]);
+
+  useEffect(() => {
+    if (!soundEnabledRef.current || infectionShot?.player !== 2 || !infectionShot.targets.length) return;
+    const sound = infectionSfxRef.current;
+    if (!sound) return;
+    sound.currentTime = 0;
+    sound.play().catch(() => undefined);
+  }, [infectionShot]);
+
+  useEffect(() => {
+    if (!soundEnabledRef.current) return;
+    const cue = bossDefeatCell !== null ? "bossDefeat" : cinematic === "ending" ? "bossClear" : result;
+    if (!cue) return;
+    const resultSounds = resultSfxRef.current;
+    const sound = resultSounds?.[cue];
+    if (!resultSounds || !sound) return;
+    Object.values(resultSounds).forEach((item) => {
+      item.pause();
+      item.currentTime = 0;
+    });
+    sound.play().catch(() => undefined);
+  }, [bossDefeatCell, cinematic, result]);
 
   useEffect(() => {
     if (view !== "battle" || result) return;
@@ -506,9 +696,28 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [result, view]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    window.scrollTo(0, 0);
+  }, [battleStageId, cinematic, hydrated, view]);
+
   const schedule = useCallback((callback: () => void, delay: number) => {
     const timer = window.setTimeout(callback, delay);
     timers.current.push(timer);
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((current) => {
+      const next = !current;
+      soundEnabledRef.current = next;
+      if (next) bgmRef.current?.play().catch(() => undefined);
+      else {
+        bgmRef.current?.pause();
+        infectionSfxRef.current?.pause();
+        Object.values(resultSfxRef.current ?? {}).forEach((sound) => sound.pause());
+      }
+      return next;
+    });
   }, []);
 
   const persistCompletion = useCallback((stageId: number) => {
@@ -534,6 +743,7 @@ export default function Home() {
     setMoveCount(0);
     setBattleElapsed(0);
     setResult(null);
+    setBossDefeatCell(null);
     setLearningGate(null);
     setFlash({ infected: [], resisted: [] });
     setInfectionShot(null);
@@ -578,13 +788,13 @@ export default function Home() {
   const resolveAiTurn = useCallback((afterPlayer: StoryBattle) => {
     let working = afterPlayer;
     if (battleStage.boss) {
-      const pulse = applyBossPulse(working, battleStage);
-      working = pulse;
+      const bossAction = applyBossTurn(working, battleStage);
+      working = bossAction;
       setBattle(working);
-      if (pulse.relationText) setFeedback(pulse.relationText);
-      setFlash({ infected: pulse.infected, resisted: [] });
-      setInfectionShot(pulse.infected.length ? { from: working.bossIndex ?? 24, targets: pulse.infected, player: 2 } : null);
-      if (!working.board.includes(1)) {
+      if (bossAction.relationText) setFeedback(bossAction.relationText);
+      setFlash({ infected: bossAction.infected, resisted: [] });
+      setInfectionShot(bossAction.infected.length ? { from: working.bossIndex ?? 24, targets: bossAction.infected, player: 2 } : null);
+      if (getStoryBattleOutcome(working) === "failed") {
         setResult("failed");
         setBusy(false);
         return;
@@ -593,6 +803,11 @@ export default function Home() {
 
     const action = chooseStoryAiMove(working, battleStage);
     if (!action) {
+      if (getStoryBattleOutcome(working) === "failed") {
+        setResult("failed");
+        setBusy(false);
+        return;
+      }
       const recovery = applyEmergencyTreatment(working, battleStage);
       if (recovery) {
         setBattle(recovery.battle);
@@ -625,7 +840,7 @@ export default function Home() {
       ? `치료 세균이 질병 세균으로 바뀌었어요! ${enemyResult.relationText}`
       : `질병 세균의 공격을 막았어요. ${enemyResult.relationText}`);
     setMoveCount((value) => value + 1);
-    if (!enemyResult.board.includes(1)) {
+    if (getStoryBattleOutcome(enemyResult) === "failed") {
       setResult("failed");
       setBusy(false);
       return;
@@ -660,20 +875,33 @@ export default function Home() {
     setBusy(true);
     setSelectedCell(null);
     const next = applyStoryMove(battle, battleStage, 1, move, relationMode);
+    const bossDefeated = battle.bossHp > 0 && next.bossHit && next.bossHp === 0;
     setBattle(next);
     setFlash({ infected: next.infected, resisted: next.resisted });
     const playerTargets = next.bossHit && next.bossIndex !== null && !next.infected.includes(next.bossIndex)
       ? [...next.infected, next.bossIndex]
       : next.infected;
     setInfectionShot(playerTargets.length ? { from: move.to, targets: playerTargets, player: 1 } : null);
-    setFeedback(next.infected.length || next.bossHit ? next.relationText : `숫자 관계가 맞지 않아요. ${next.relationText}`);
+    setFeedback(bossDefeated
+      ? "마지막 치료가 적중했습니다! 보스 세균의 핵이 붕괴합니다."
+      : next.infected.length || next.bossHit ? next.relationText : `숫자 관계가 맞지 않아요. ${next.relationText}`);
+    if (bossDefeated) {
+      setBossDefeatCell(next.bossIndex ?? move.to);
+      schedule(() => setBossDefeatCell(null), 2150);
+    }
     setMoveCount((value) => value + 1);
-    if (!next.board.includes(2)) {
-      schedule(() => requestCompletion(battleStage), 780);
+    const outcome = getStoryBattleOutcome(next);
+    if (outcome === "clear") {
+      schedule(() => requestCompletion(battleStage), bossDefeated ? 2200 : 780);
+      return;
+    }
+    if (outcome === "failed") {
+      setResult("failed");
+      setBusy(false);
       return;
     }
     setTurn(2);
-    schedule(() => resolveAiTurn(next), battleStage.boss ? 1050 : 800);
+    schedule(() => resolveAiTurn(next), bossDefeated ? 2200 : battleStage.boss ? 1050 : 800);
   }, [battle, battleStage, relationMode, requestCompletion, resolveAiTurn, schedule]);
 
   const learningTasks = STAGE_LEARNING_TASKS[battleStage.id] ?? [];
@@ -753,16 +981,30 @@ export default function Home() {
       setCinematic(null);
       beginBattle(STORY_STAGES[0]);
     } else {
+      window.localStorage.removeItem(STORY_SAVE_KEY);
+      window.localStorage.removeItem(LEGACY_STORY_SAVE_KEY);
       setCinematic(null);
       setResult(null);
-      setView("map");
-      setSelectedStageId(BOSS_STAGE_ID);
+      setLearningGate(null);
+      setSelectedCell(null);
+      setHoveredCell(null);
+      setFlash({ infected: [], resisted: [] });
+      setInfectionShot(null);
+      setBossDefeatCell(null);
+      setBusy(false);
+      setFreeBattle(false);
+      setCompleted([]);
+      setSelectedStageId(1);
+      setBattleStageId(1);
+      setBattle(createStoryBattle(STORY_STAGES[0]));
+      setView("title");
     }
   }, [beginBattle, cinematic]);
 
   const remainingDisease = battle.board.filter((cell) => cell === 2).length;
   const therapyCount = battle.board.filter((cell) => cell === 1).length;
   const occupiedPercent = Math.round(((remainingDisease + therapyCount) / battle.board.length) * 100);
+  const boardFull = !battle.board.includes(0);
   const therapyCaptures = Math.max(0, battleStage.enemyNumbers.length - remainingDisease);
   const diseaseCaptures = Math.max(0, battleStage.playerNumbers.length - therapyCount);
   const selectedNumber = selectedCell === null ? null : battle.numbers[selectedCell];
@@ -778,21 +1020,22 @@ export default function Home() {
   if (!hydrated) return <main className="story-app loading-screen"><div className="loader-germ">∴</div><p>치료 세균을 만드는 중...</p></main>;
 
   if (view === "title") {
-    return <TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} />;
+    return <><TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;
   }
 
   if (view === "free") {
-    return <FreeBattle onExit={() => setView("title")} />;
+    return <><FreeBattle onExit={() => setView("title")} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;
   }
 
   return (
-    <main className="story-app">
+    <main className={`story-app view-${view}`}>
+      <AudioToggle enabled={soundEnabled} onToggle={toggleSound} />
       {view === "map" && <header className="command-header">
         <button className="brand" onClick={() => setView("title")} aria-label="게임 시작 화면으로 이동">
-          <span className="brand-mark">ƒ</span>
+          <span className="brand-mark factor-mark" aria-hidden="true"><i /><i /><i /></span>
           <span><b>FACTOR FORCE</b><small>약수와 배수 지구 방어대</small></span>
         </button>
-        <nav aria-label="게임 모드">
+        <nav className="desktop-mode-nav" aria-label="게임 모드">
           <button className={view === "map" && !freeBattle ? "active" : ""} onClick={() => { setView("map"); setFreeBattle(false); }}>스토리 작전</button>
           <button onClick={() => setView("free")}>자유 대전</button>
         </nav>
@@ -801,6 +1044,10 @@ export default function Home() {
           <i><em style={{ width: `${(completed.length / STORY_STAGE_COUNT) * 100}%` }} /></i>
         </div>
       </header>}
+      {view === "map" && <nav className="mobile-mode-nav" aria-label="모바일 게임 모드">
+        <button className="active" onClick={() => { setView("map"); setFreeBattle(false); }}><span aria-hidden="true">●</span> 스토리 작전</button>
+        <button onClick={() => setView("free")}><span aria-hidden="true">◆</span> 자유 대전</button>
+      </nav>}
 
       {view === "map" ? (
         <div className="map-layout">
@@ -827,11 +1074,10 @@ export default function Home() {
           <header className="petri-topbar">
             <button className="petri-brand" onClick={returnToMap} aria-label="세계 작전 지도로 돌아가기">
               <span className="petri-brand-mark"><i /><i /><i /></span>
-              <span><strong>페트리</strong><small>// 07</small></span>
+              <span><strong>페트리</strong><small>{"// 07"}</small></span>
             </button>
             <div className="petri-topbar-center"><span className="petri-live-dot" /><span>게임 시간</span><b>{formatTime(battleElapsed)}</b></div>
             <nav className="petri-top-actions" aria-label="전투 메뉴">
-              <button aria-label="소리">◖))</button>
               <button aria-label="학습 목표" title={battleStage.learning}>?</button>
               <button className="petri-stage-button" onClick={returnToMap}><span>{freeBattle ? "자유 대전" : `${battleStage.lesson} · 7×7`}</span><b>지도</b></button>
             </nav>
@@ -869,6 +1115,7 @@ export default function Home() {
                     hovered={hoveredCell}
                     flash={flash}
                     shot={infectionShot}
+                    bossDefeatCell={bossDefeatCell}
                     relationMode={relationMode}
                     disabled={busy || !!result}
                     onCell={handleCell}
@@ -904,7 +1151,7 @@ export default function Home() {
               <div className="petri-score-block"><small>세균 수</small><strong>{String(remainingDisease).padStart(2, "0")}</strong></div>
               <div className="petri-player-metrics">
                 <span><small>빼앗김</small><b>+{diseaseCaptures}</b></span>
-                <span><small>난이도</small><b>{battleStage.difficulty === 1 ? "쉬움" : battleStage.difficulty === 2 ? "보통" : "어려움"}</b></span>
+                <span><small>난이도</small><b>{battleStage.boss ? "최종전" : battleStage.difficulty === 1 ? "쉬움" : battleStage.difficulty === 2 ? "보통" : "어려움"}</b></span>
                 <span><small>{battleStage.boss ? "남은 치료" : "모드"}</small><b>{battleStage.boss ? `×${battle.bossHp}` : `×${battleStage.modes.length}`}</b></span>
               </div>
             </aside>
@@ -923,8 +1170,8 @@ export default function Home() {
           <section className={`result-card ${result}`}>
             <span className="result-symbol">{result === "clear" ? "✓" : "!"}</span>
             <small>{result === "clear" ? "지역 구하기 성공" : "치료 작전 실패"}</small>
-            <h2>{result === "clear" ? `${battleStage.place} 구하기 완료` : "치료 세균이 모두 감염됐어요"}</h2>
-            <p>{result === "clear" ? `${battleStage.lesson}의 핵심 개념으로 질병 세균을 모두 제거했습니다.` : "숫자 관계와 모드를 다시 확인하고 재도전하세요."}</p>
+            <h2>{result === "clear" ? `${battleStage.place} 구하기 완료` : boardFull ? "게임판이 가득 찼어요" : "치료 세균이 모두 감염됐어요"}</h2>
+            <p>{result === "clear" ? `${battleStage.lesson}의 핵심 개념으로 질병 세균을 모두 제거했습니다.` : boardFull ? "질병 세균이 남은 채 모든 칸이 점유되어 미션에 실패했습니다." : "숫자 관계와 모드를 다시 확인하고 재도전하세요."}</p>
             <div>
               <button onClick={() => beginBattle(battleStage, freeBattle)}>다시 하기</button>
               <button className="primary" onClick={returnToMap}>{freeBattle ? "스토리 지도로" : battleStage.id < BOSS_STAGE_ID ? "다음 작전 확인" : "세계 지도"} →</button>
