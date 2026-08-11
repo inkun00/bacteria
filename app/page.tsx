@@ -7,6 +7,7 @@ export const dynamic = "force-static";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import FreeBattle from "./free-battle";
 import "./free-battle.css";
+import { assetUrl } from "./assets";
 import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
 import { HALL_TIERS, getHallTier, hallTierRange, normalizeHallAttempts, type HallOfFameRecord } from "./hall-of-fame";
 import {
@@ -167,14 +168,13 @@ function Germ({
   mode?: RelationMode;
   boss?: boolean;
 }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const storyDisease = player === 2 && !infection;
   const sprite = boss ? "boss-germ-sprite.webp" : infection ? "bacteria-infection.webp" : storyDisease ? "story-disease-germ-idle.webp" : "bacteria-idle.webp";
   return (
     <span
       className={`germ-sprite p${player} ${infection ? "infection" : "idle"} ${storyDisease ? "story-disease" : ""} ${boss ? "boss" : ""}`}
       aria-hidden="true"
-      style={{ backgroundImage: `url("${basePath}/assets/${sprite}")` }}
+      style={{ backgroundImage: `url("${assetUrl(`/assets/${sprite}`)}")` }}
     >
       {number !== undefined && <b className="germ-number">{number}</b>}
       {mode && <em className={`germ-mode ${mode}`}>{MODE_COPY[mode].short}</em>}
@@ -183,12 +183,11 @@ function Germ({
 }
 
 function TitleScreen({ onStory, onFree, onHallOfFame }: { onStory: () => void; onFree: () => void; onHallOfFame: () => void }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   return (
     <main className="title-screen">
       <img
         className="title-hero-image"
-        src={`${basePath}/assets/story/opening.webp`}
+        src={assetUrl("/assets/story/opening.webp")}
         alt="숫자 질병 세균의 확산에 맞서는 치료 세균 지구 방어대"
         loading="eager"
         fetchPriority="high"
@@ -228,7 +227,6 @@ function TitleScreen({ onStory, onFree, onHallOfFame }: { onStory: () => void; o
 function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => void }) {
   const [captionIndex, setCaptionIndex] = useState(0);
   const captions = kind === "opening" ? OPENING_CAPTIONS : ENDING_CAPTIONS;
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const sceneImages = kind === "opening"
     ? [
       "opening-01.webp",
@@ -268,7 +266,7 @@ function Cinematic({ kind, onFinish }: { kind: CinematicKind; onFinish: () => vo
       <img
         className={kind === "opening" ? "opening-scene" : ""}
         key={`${kind}-${captionIndex}`}
-        src={`${basePath}/assets/story/${sceneImage}`}
+        src={assetUrl(`/assets/story/${sceneImage}`)}
         alt=""
         loading="eager"
         decoding="async"
@@ -300,7 +298,11 @@ function WorldMap({
 }) {
   const unlocked = Math.min(STORY_STAGE_COUNT, Math.max(1, completed.length ? Math.max(...completed) + 1 : 1));
   return (
-    <section className="world-map" aria-label="세계 감염 지도">
+    <section
+      className="world-map"
+      aria-label="세계 감염 지도"
+      style={{ "--world-map-image": `url("${assetUrl("/assets/story/world-operation-map.webp")}")` } as CSSProperties}
+    >
       <div className="map-grid" />
       <div className="continent north-america"><span>북아메리카</span></div>
       <div className="continent south-america"><span>남아메리카</span></div>
@@ -489,12 +491,11 @@ function HallOfFame({
   onFinish: () => void;
 }) {
   const submitted = status === "success";
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const tier = getHallTier(attempts);
   return (
     <div className="hall-of-fame" role="dialog" aria-modal="true" aria-labelledby="hall-of-fame-title">
       <section className="hall-of-fame-card">
-        <img className="hall-of-fame-badge" src={`${basePath}${tier.badge}`} alt={`${tier.title} 뱃지`} />
+        <img className="hall-of-fame-badge" src={assetUrl(tier.badge)} alt={`${tier.title} 뱃지`} />
         <small>BOSS STAGE CLEAR · LEVEL {tier.level}</small>
         <h2 id="hall-of-fame-title">{tier.title}</h2>
         <p>{tier.description} 칭호와 뱃지를 획득했습니다.</p>
@@ -616,7 +617,7 @@ function HallOfFameBoard({ onBack }: { onBack: () => void }) {
             {records.slice(0, 3).map((record) => (
               <article key={record.id} className={`rank-${record.rank}`}>
                 <strong>{record.rank}</strong>
-                <img src={`${basePath}${record.tier.badge}`} alt={`${record.tier.title} 뱃지`} />
+                <img src={assetUrl(record.tier.badge)} alt={`${record.tier.title} 뱃지`} />
                 <h3>{record.nickname}</h3>
                 <b>{record.tier.title}</b>
                 <p>{record.attempts}회 클리어</p>
@@ -630,7 +631,7 @@ function HallOfFameBoard({ onBack }: { onBack: () => void }) {
               <article key={record.id} className={record.rank <= 3 ? `top-rank rank-${record.rank}` : ""}>
                 <div className="hall-rank-player">
                   <strong>{record.rank}</strong>
-                  <img src={`${basePath}${record.tier.badge}`} alt="" aria-hidden="true" />
+                  <img src={assetUrl(record.tier.badge)} alt="" aria-hidden="true" />
                   <b>{record.nickname}</b>
                 </div>
                 <div className="hall-rank-tier"><small>LEVEL {record.tier.level}</small><b>{record.tier.title}</b></div>
@@ -648,7 +649,7 @@ function HallOfFameBoard({ onBack }: { onBack: () => void }) {
         <div className="hall-tier-grid">
           {HALL_TIERS.map((tier) => (
             <article key={tier.level}>
-              <img src={`${basePath}${tier.badge}`} alt="" aria-hidden="true" />
+              <img src={assetUrl(tier.badge)} alt="" aria-hidden="true" />
               <span><small>LEVEL {tier.level} · {hallTierRange(tier)}</small><b>{tier.title}</b></span>
             </article>
           ))}
@@ -681,7 +682,6 @@ function BattleBoard({
   onCell: (index: number) => void;
   onHover: (index: number | null) => void;
 }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const targets = useMemo(() => new Set(
     selected === null ? [] : legalMoves(battle.board, 1).filter((move) => move.from === selected).map((move) => move.to),
   ), [battle.board, selected]);
@@ -757,7 +757,7 @@ function BattleBoard({
           style={{
             "--boss-x": `${(((bossDefeatCell % 7) + .5) / 7) * 100}%`,
             "--boss-y": `${((Math.floor(bossDefeatCell / 7) + .5) / 7) * 100}%`,
-            "--boss-image": `url("${basePath}/assets/boss-germ-sprite.webp")`,
+            "--boss-image": `url("${assetUrl("/assets/boss-germ-sprite.webp")}")`,
           } as CSSProperties}
         >
           <span className="boss-defeat-core" aria-hidden="true">
@@ -844,14 +844,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-    const bgm = new Audio(`${basePath}${MUSIC_TRACKS.menu}`);
-    const infectionSfx = new Audio(`${basePath}/assets/audio/infection-splat.ogg`);
+    const bgm = new Audio(assetUrl(MUSIC_TRACKS.menu));
+    const infectionSfx = new Audio(assetUrl("/assets/audio/infection-splat.ogg"));
     const resultSounds = {
-      clear: new Audio(`${basePath}${RESULT_SOUNDS.clear}`),
-      failed: new Audio(`${basePath}${RESULT_SOUNDS.failed}`),
-      bossClear: new Audio(`${basePath}${RESULT_SOUNDS.bossClear}`),
-      bossDefeat: new Audio(`${basePath}${RESULT_SOUNDS.bossDefeat}`),
+      clear: new Audio(assetUrl(RESULT_SOUNDS.clear)),
+      failed: new Audio(assetUrl(RESULT_SOUNDS.failed)),
+      bossClear: new Audio(assetUrl(RESULT_SOUNDS.bossClear)),
+      bossDefeat: new Audio(assetUrl(RESULT_SOUNDS.bossDefeat)),
     };
     bgm.loop = true;
     bgm.preload = "auto";
@@ -899,7 +898,6 @@ export default function Home() {
   useEffect(() => {
     const bgm = bgmRef.current;
     if (!bgm) return;
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     const isMissionView = view === "battle" || view === "free";
     const track = cinematic === "opening"
       ? MUSIC_TRACKS.opening
@@ -908,7 +906,7 @@ export default function Home() {
         : isMissionView
           ? MUSIC_TRACKS.mission
           : MUSIC_TRACKS.menu;
-    const nextSource = `${basePath}${track}`;
+    const nextSource = assetUrl(track);
     if (bgm.getAttribute("src") === nextSource) return;
 
     bgm.pause();

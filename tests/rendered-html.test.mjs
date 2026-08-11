@@ -93,7 +93,8 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(story, /2차시 · 약수 이해하기/);
   assert.match(story, /9차시 · 생활 속 최소공배수/);
   assert.match(styles, /\.world-map/);
-  assert.match(styles, /world-operation-map\.webp/);
+  assert.match(styles, /--world-map-image/);
+  assert.match(page, /world-operation-map\.webp/);
   assert.match(styles, /\.cinematic/);
   assert.match(page, /petri-battle-screen/);
   assert.match(page, /infection-projectile-layer/);
@@ -169,6 +170,24 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   assert.match(page, /boss \? "boss-germ-sprite\.webp"/);
   assert.match(styles, /@keyframes bossGermSprite/);
   assert.match(styles, /\.germ-sprite\.boss \{[\s\S]*?width: 93%;[\s\S]*?background-size: 700% auto;[\s\S]*?animation: bossGermSprite 1\.05s steps\(6\)/);
+});
+
+test("versions and long-caches immutable media assets", async () => {
+  const [assetHelpers, nextConfig, vercelConfigSource] = await Promise.all([
+    readFile(new URL("../app/assets.ts", import.meta.url), "utf8"),
+    readFile(new URL("../next.config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../vercel.json", import.meta.url), "utf8"),
+  ]);
+  const vercelConfig = JSON.parse(vercelConfigSource);
+  const cachedSources = vercelConfig.headers.map((entry) => entry.source);
+
+  assert.match(assetHelpers, /NEXT_PUBLIC_ASSET_VERSION/);
+  assert.match(assetHelpers, /encodeURIComponent\(ASSET_VERSION\)/);
+  assert.match(nextConfig, /VERCEL_GIT_COMMIT_SHA/);
+  assert.deepEqual(cachedSources, ["/assets/(.*)", "/favicon.png", "/og-commercial.jpg"]);
+  for (const entry of vercelConfig.headers) {
+    assert.equal(entry.headers[0].value, "public, max-age=31536000, immutable");
+  }
 });
 
 test("ships the title mode selector and restored classic free battle", async () => {

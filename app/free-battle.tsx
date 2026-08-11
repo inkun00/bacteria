@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { assetUrl } from "./assets";
 import {
   applyMove,
   chooseAiAction,
@@ -107,14 +108,13 @@ function Germ({
   number?: number;
   mode?: RelationMode;
 }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const sprite = infection ? "bacteria-infection.webp" : "bacteria-idle.webp";
 
   return (
     <span
       className={`germ-sprite p${player} ${infection ? "infection" : "idle"}`}
       aria-hidden="true"
-      style={{ backgroundImage: `url("${basePath}/assets/${sprite}")` }}
+      style={{ backgroundImage: `url("${assetUrl(`/assets/${sprite}`)}")` }}
     >
       {number !== undefined && <b className="germ-number">{number}</b>}
       {mode && <em className={`germ-mode ${mode}`}>{mode === "divisor" ? "약" : mode === "multiple" ? "배" : "분"}</em>}
@@ -170,8 +170,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const animationWatchdog = useRef<number | null>(null);
 
   useEffect(() => {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-    const infectionSfx = new Audio(`${basePath}/assets/audio/infection-splat.ogg`);
+    const infectionSfx = new Audio(assetUrl("/assets/audio/infection-splat.ogg"));
     infectionSfx.preload = "auto";
     infectionSfx.volume = 0.56;
     infectionSfx.load();
