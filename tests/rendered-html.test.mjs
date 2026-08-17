@@ -24,6 +24,18 @@ test("server-renders the Korean Factor Force shell", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton|codex-preview/i);
 });
 
+test("uses the animated treatment germ on the loading screen", async () => {
+  const [page, styles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /loader-germ[\s\S]*?<Germ player=\{1\}/);
+  assert.doesNotMatch(page, /<div className="loader-germ">∴<\/div>/);
+  assert.match(styles, /\.loader-germ \.germ-sprite/);
+  assert.match(styles, /@keyframes loaderScan/);
+});
+
 test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic assets", async () => {
   const [layout, page, story, styles, opening, openingFirstScene, ending, worldMap, idleGerm, infectionGerm, storyDiseaseGerm, bossGermSprite, backgroundMusic, missionMusic, openingMusic, endingMusic, infectionSound, stageClearSound, stageFailedSound, bossClearSound, bossDefeatSound, audioCredits] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),

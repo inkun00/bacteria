@@ -1474,7 +1474,14 @@ export default function Home() {
         : "분열 후 새 수의 배수인지 확인"
     : null;
 
-  if (!hydrated) return <main className="story-app loading-screen"><div className="loader-germ">∴</div><p>치료 세균을 만드는 중...</p></main>;
+  if (!hydrated) return (
+    <main className="story-app loading-screen">
+      <div className="loader-germ" role="img" aria-label="치료 세균 준비 애니메이션">
+        <Germ player={1} />
+      </div>
+      <p>치료 세균을 만드는 중...</p>
+    </main>
+  );
 
   if (view === "title") {
     return <><TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} onTutorial={() => setView("tutorial")} onHallOfFame={() => setView("hall")} tutorialCompleted={tutorialCompleted} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;

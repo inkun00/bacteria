@@ -995,9 +995,27 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .caption-progress i { width: 28px; height: 3px; background: rgba(255,255,255,.2); }
 .caption-progress i.on { background: var(--cyan); }
 
-.loading-screen { display: grid; place-items: center; align-content: center; gap: 15px; color: #87a5b8; font-size: 12px; }
-.loader-germ { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 45% 55%; color: var(--navy); background: var(--cyan); font-size: 24px; animation: loader 1.3s ease-in-out infinite; }
-@keyframes loader { 50% { transform: translateY(-7px) rotate(5deg); } }
+.loading-screen { display: grid; place-items: center; align-content: center; gap: 17px; color: #87a5b8; font-size: 12px; }
+.loading-screen p { margin: 0; letter-spacing: .04em; animation: loadingCopyPulse 1.6s ease-in-out infinite; }
+.loader-germ {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(67,229,218,.2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(67,229,218,.13), rgba(67,229,218,.025) 58%, transparent 60%);
+  box-shadow: 0 0 38px rgba(67,229,218,.1), inset 0 0 28px rgba(67,229,218,.07);
+  animation: loaderFloat 1.7s ease-in-out infinite;
+}
+.loader-germ::before, .loader-germ::after { content: ""; position: absolute; border: 1px solid rgba(67,229,218,.2); border-radius: 50%; animation: loaderScan 2s ease-out infinite; }
+.loader-germ::before { inset: 8px; }
+.loader-germ::after { inset: -6px; animation-delay: 1s; }
+.loader-germ .germ-sprite { z-index: 1; width: 86px; filter: drop-shadow(0 12px 17px rgba(0,0,0,.5)) drop-shadow(0 0 12px rgba(67,229,218,.2)); }
+@keyframes loaderFloat { 50% { transform: translateY(-7px) rotate(2deg); } }
+@keyframes loaderScan { 0% { opacity: 0; transform: scale(.72); } 35% { opacity: .7; } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes loadingCopyPulse { 50% { color: #c7e0da; } }
 
 @media (max-width: 1180px) {
   .map-layout { grid-template-columns: 250px minmax(500px, 1fr) 290px; }
