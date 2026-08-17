@@ -247,3 +247,26 @@ test("preserves active games and confirms navigation away", async () => {
   assert.match(freeBattle, /<GameExitPrompt/);
   assert.match(styles, /\.game-exit-backdrop/);
 });
+
+test("ships an interactive divisor, multiple, and split tutorial", async () => {
+  const [page, tutorial, tutorialStyles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/tutorial.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/tutorial.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /튜토리얼 모드/);
+  assert.match(page, /view === "tutorial"/);
+  assert.match(page, /TUTORIAL_COMPLETE_KEY/);
+  assert.match(tutorial, /약수 훈련/);
+  assert.match(tutorial, /배수 훈련/);
+  assert.match(tutorial, /분열 훈련/);
+  assert.match(tutorial, /6 ÷ 3 = 2/);
+  assert.match(tutorial, /8 ÷ 4 = 2/);
+  assert.match(tutorial, /12 = 3 × 4/);
+  assert.match(tutorial, /role="grid"/);
+  assert.match(tutorial, /TRAINING COMPLETE/);
+  assert.match(tutorialStyles, /\.tutorial-board/);
+  assert.match(tutorialStyles, /@media \(max-width: 720px\)/);
+  assert.match(tutorialStyles, /prefers-reduced-motion/);
+});

@@ -7,6 +7,8 @@ export const dynamic = "force-static";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import FreeBattle from "./free-battle";
 import "./free-battle.css";
+import TutorialMode, { TUTORIAL_COMPLETE_KEY } from "./tutorial";
+import "./tutorial.css";
 import { assetUrl } from "./assets";
 import { GameExitPrompt, usePreventGameUnload } from "./game-navigation";
 import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
@@ -95,7 +97,7 @@ const ENDING_CAPTIONS = [
   "전 세계가 힘을 합쳐 지켜 낸 지구. 약수와 배수로 이어진 우리의 연대는 새로운 평화를 밝혔습니다.",
 ];
 
-type View = "title" | "map" | "battle" | "free" | "hall";
+type View = "title" | "map" | "battle" | "free" | "tutorial" | "hall";
 type BattleResult = "clear" | "failed" | null;
 type CinematicKind = "opening" | "ending";
 type LearningGateState = {
@@ -220,7 +222,19 @@ function Germ({
   );
 }
 
-function TitleScreen({ onStory, onFree, onHallOfFame }: { onStory: () => void; onFree: () => void; onHallOfFame: () => void }) {
+function TitleScreen({
+  onStory,
+  onFree,
+  onTutorial,
+  onHallOfFame,
+  tutorialCompleted,
+}: {
+  onStory: () => void;
+  onFree: () => void;
+  onTutorial: () => void;
+  onHallOfFame: () => void;
+  tutorialCompleted: boolean;
+}) {
   return (
     <main className="title-screen">
       <img
@@ -248,6 +262,9 @@ function TitleScreen({ onStory, onFree, onHallOfFame }: { onStory: () => void; o
         <div className="title-actions">
           <button className="story-launch" onClick={onStory}>
             <span><small>이야기 작전</small><b>스토리 모드</b><em>감염된 세계 여러 지역을 차례로 구하세요</em></span><i>→</i>
+          </button>
+          <button className={`tutorial-launch ${tutorialCompleted ? "completed" : ""}`} onClick={onTutorial}>
+            <span><small>{tutorialCompleted ? "기초 훈련 완료" : "처음 시작 추천"}</small><b>튜토리얼 모드</b><em>약수·배수·분열 조작을 직접 연습하세요</em></span><i>{tutorialCompleted ? "✓" : "→"}</i>
           </button>
           <button className="free-launch" onClick={onFree}>
             <span><small>자유롭게 겨루기</small><b>자유 대전</b><em>처음 수학 세균전 규칙으로 겨루세요</em></span><i>→</i>
@@ -852,6 +869,7 @@ export default function Home() {
   const [hallOfFameStatus, setHallOfFameStatus] = useState<HallOfFameStatus>("idle");
   const [hallOfFameError, setHallOfFameError] = useState("");
   const [storyExitPromptOpen, setStoryExitPromptOpen] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const timers = useRef<number[]>([]);
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
@@ -877,6 +895,7 @@ export default function Home() {
         window.localStorage.setItem(STORY_ATTEMPTS_KEY, String(restoredAttempts));
       }
       setSelectedStageId(Math.min(STORY_STAGE_COUNT, Math.max(1, progress.length ? Math.max(...progress) + 1 : 1)));
+      setTutorialCompleted(window.localStorage.getItem(TUTORIAL_COMPLETE_KEY) === "true");
       const activeBattle = loadActiveStoryBattle();
       if (activeBattle) {
         setBattleStageId(activeBattle.battleStageId);
@@ -961,7 +980,7 @@ export default function Home() {
   useEffect(() => {
     const bgm = bgmRef.current;
     if (!bgm) return;
-    const isMissionView = view === "battle" || view === "free";
+    const isMissionView = view === "battle" || view === "free" || view === "tutorial";
     const track = cinematic === "opening"
       ? MUSIC_TRACKS.opening
       : cinematic === "ending"
@@ -1458,11 +1477,18 @@ export default function Home() {
   if (!hydrated) return <main className="story-app loading-screen"><div className="loader-germ">∴</div><p>치료 세균을 만드는 중...</p></main>;
 
   if (view === "title") {
-    return <><TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} onHallOfFame={() => setView("hall")} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;
+    return <><TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} onTutorial={() => setView("tutorial")} onHallOfFame={() => setView("hall")} tutorialCompleted={tutorialCompleted} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;
   }
 
   if (view === "free") {
     return <><FreeBattle onExit={() => setView("title")} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;
+  }
+
+  if (view === "tutorial") {
+    return <><TutorialMode onExit={() => setView("title")} onStory={() => setView("map")} onComplete={() => {
+      window.localStorage.setItem(TUTORIAL_COMPLETE_KEY, "true");
+      setTutorialCompleted(true);
+    }} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;
   }
 
   if (view === "hall") {
