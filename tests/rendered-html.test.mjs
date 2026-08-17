@@ -276,6 +276,11 @@ test("ships an interactive divisor, multiple, and split tutorial", async () => {
   assert.match(tutorial, /6 ÷ 3 = 2/);
   assert.match(tutorial, /8 ÷ 4 = 2/);
   assert.match(tutorial, /12 = 3 × 4/);
+  assert.match(tutorial, /선택한 치료 세균을 다시 누르면 모드가 바뀝니다/);
+  assert.match(tutorial, /function nextTutorialMode/);
+  assert.match(tutorial, /current\.action\.kind === "toggle"/);
+  assert.doesNotMatch(tutorial, /handleMode/);
+  assert.doesNotMatch(tutorial, /onClick=\{\(\) => handleMode/);
   assert.match(tutorial, /role="grid"/);
   assert.match(tutorial, /TRAINING COMPLETE/);
   assert.match(tutorialStyles, /\.tutorial-board/);
