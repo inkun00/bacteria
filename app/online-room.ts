@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signInAnonymously, type Auth } from "firebase/auth";
 import {
+  equalTo,
   get,
+  limitToLast,
   onChildAdded,
   onDisconnect,
   onValue,
+  orderByChild,
   push,
+  query,
   ref,
   remove,
   runTransaction,
@@ -26,6 +30,16 @@ export type OnlinePlayer = {
 };
 
 export type OnlineMatchSize = 2 | 4;
+
+export type OnlineRoomSummary = {
+  code: string;
+  hostName: string;
+  hostRating: number;
+  boardSize: BoardSize;
+  matchSize: OnlineMatchSize;
+  playerCount: number;
+  createdAt: number;
+};
 
 export type OnlineMoveResult = {
   board: Cell[];
@@ -73,6 +87,7 @@ type RoomRecord = {
   status?: "waiting" | "playing";
   players?: Record<string, Omit<OnlinePlayer, "uid" | "connected"> & { joinedAt?: number }>;
   slotOwners?: Record<string, string>;
+  createdAt?: number;
 };
 
 type SignalRecord = {
@@ -137,6 +152,9 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const [localSlot, setLocalSlot] = useState<number | null>(null);
   const [roomBoardSize, setRoomBoardSize] = useState<BoardSize>(7);
   const [matchSize, setMatchSize] = useState<OnlineMatchSize>(DEFAULT_MATCH_SIZE);
+  const [availableRooms, setAvailableRooms] = useState<OnlineRoomSummary[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [roomsRefreshedAt, setRoomsRefreshedAt] = useState<number | null>(null);
   const databaseRef = useRef<Database | null>(null);
   const roomCodeRef = useRef("");
   const localUidRef = useRef("");
@@ -450,6 +468,43 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     }
   }, [getServices, leave, subscribeToRoom]);
 
+  const refreshRooms = useCallback(async () => {
+    setRoomsLoading(true);
+    setError(null);
+    try {
+      const { database } = await getServices();
+      const snapshot = await get(query(
+        ref(database, "rooms"),
+        orderByChild("status"),
+        equalTo("waiting"),
+        limitToLast(40),
+      ));
+      const value = snapshot.val() as Record<string, RoomRecord> | null;
+      const rooms = Object.entries(value ?? {}).flatMap(([code, room]) => {
+        const roomMatchSize: OnlineMatchSize = room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
+        const roomPlayers = Object.entries(room.players ?? {});
+        if (room.status !== "waiting" || roomPlayers.length >= roomMatchSize) return [];
+        const host = room.hostId ? room.players?.[room.hostId] : roomPlayers.find(([, player]) => player.slot === 0)?.[1];
+        return [{
+          code,
+          hostName: cleanName(host?.name ?? "이름 없는 방장"),
+          hostRating: Number.isFinite(host?.rating) ? Math.max(0, Math.round(host?.rating ?? 1000)) : 1000,
+          boardSize: room.boardSize === 9 || room.boardSize === 11 ? room.boardSize : 7,
+          matchSize: roomMatchSize,
+          playerCount: roomPlayers.length,
+          createdAt: Number.isFinite(room.createdAt) ? room.createdAt ?? 0 : 0,
+        } satisfies OnlineRoomSummary];
+      });
+      rooms.sort((left, right) => right.createdAt - left.createdAt || left.code.localeCompare(right.code));
+      setAvailableRooms(rooms);
+      setRoomsRefreshedAt(Date.now());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "방 목록을 불러오지 못했습니다.");
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, [getServices]);
+
   const sendToHost = useCallback((message: OnlineGameMessage) => {
     const uid = localUidRef.current;
     if (isHostRef.current) {
@@ -500,6 +555,10 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     localSlot,
     isHost: Boolean(localUid && localUid === hostUid),
     allConnected: players.length === matchSize && players.every((player) => player.connected),
+    availableRooms,
+    roomsLoading,
+    roomsRefreshedAt,
+    refreshRooms,
     createRoom,
     joinRoom,
     leave,

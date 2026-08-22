@@ -15,6 +15,10 @@ test("online 2v2 uses Firebase signaling and STUN-only WebRTC", async () => {
   assert.match(source, /slotOwners\/slot\$\{candidate\}/);
   assert.match(source, /current === null \? uid : undefined/);
   assert.match(firebaseClient, /setPersistence\(auth, browserSessionPersistence\)/);
+  assert.match(source, /orderByChild\("status"\)/);
+  assert.match(source, /equalTo\("waiting"\)/);
+  assert.match(source, /limitToLast\(40\)/);
+  assert.match(source, /refreshRooms/);
 });
 
 test("ranked accounts persist Elo MMR and expose a top-50 leaderboard", async () => {
@@ -41,4 +45,7 @@ test("free battle exposes room creation, joining, and four connected slots", asy
   assert.match(source, /방 코드 6자리/);
   assert.match(source, /Array\.from\(\{ length: online\.matchSize \}/);
   assert.match(source, /TURN 없이 직접 연결만 사용합니다/);
+  assert.match(source, /참가 가능한 게임방/);
+  assert.match(source, /새로고침/);
+  assert.match(source, /online\.availableRooms\.map/);
 });

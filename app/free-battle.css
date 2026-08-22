@@ -364,6 +364,29 @@
 .free-battle .rank-account-card span { color: #78998e; font-size: 8px; }
 .free-battle .rank-account-card > button { min-height: 34px; padding: 0 10px; border: 1px solid rgba(255,201,87,.3); border-radius: 7px; color: #ffe0a0; background: rgba(255,189,67,.07); font-size: 8px; font-weight: 800; cursor: pointer; }
 .free-battle .rank-account-card > button.account-logout { border-color: rgba(116,160,145,.25); color: #78988e; background: transparent; }
+.free-battle .room-browser { margin: 0 0 14px; padding: 12px; border: 1px solid rgba(112,158,143,.2); border-radius: 10px; background: rgba(1,12,10,.42); }
+.free-battle .room-browser > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.free-battle .room-browser > header > div { display: grid; gap: 3px; }
+.free-battle .room-browser > header b { color: #dff9ef; font-size: 10px; }
+.free-battle .room-browser > header small { color: #628378; font-size: 7px; }
+.free-battle .room-browser > header button { height: 32px; display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; border: 1px solid rgba(53,234,211,.32); border-radius: 7px; color: var(--cyan); background: rgba(53,234,211,.06); font-size: 8px; font-weight: 800; cursor: pointer; }
+.free-battle .room-browser > header button:disabled { opacity: .48; cursor: wait; }
+.free-battle .room-browser > header button span { font: 900 15px var(--font-geist-mono),monospace; }
+.free-battle .room-list { display: grid; gap: 7px; max-height: 250px; overflow-y: auto; padding-right: 2px; }
+.free-battle .room-list article { display: grid; grid-template-columns: 82px minmax(105px,1.4fr) minmax(82px,1fr) 58px; align-items: center; gap: 10px; min-height: 62px; padding: 8px 9px; border: 1px solid rgba(112,158,143,.18); border-radius: 8px; background: rgba(90,145,126,.035); }
+.free-battle .room-list article.duel { border-left: 3px solid rgba(53,234,211,.65); }
+.free-battle .room-list article.team { border-left: 3px solid rgba(255,196,87,.65); }
+.free-battle .room-mode, .free-battle .room-host, .free-battle .room-occupancy { min-width: 0; display: grid; gap: 2px; }
+.free-battle .room-mode strong { color: var(--cyan); font: 900 13px var(--font-geist-mono),monospace; }
+.free-battle .room-list article.team .room-mode strong { color: #ffd374; }
+.free-battle .room-list article small { color: #63867a; font-size: 7px; }
+.free-battle .room-list article b { overflow: hidden; color: #e7fff6; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.free-battle .room-list article span { color: #78998e; font-size: 7px; }
+.free-battle .room-list article > button { height: 36px; border: 0; border-radius: 7px; color: #05231c; background: var(--cyan); font-size: 9px; font-weight: 900; cursor: pointer; }
+.free-battle .room-list article > button:disabled { opacity: .42; cursor: wait; }
+.free-battle .room-browser-state { min-height: 66px; display: grid; place-items: center; align-content: center; gap: 4px; border: 1px dashed rgba(112,158,143,.18); border-radius: 8px; color: #6e9085; font-size: 9px; text-align: center; }
+.free-battle .room-browser-state b { color: #91afa5; }
+.free-battle .room-browser-state span { color: #5f7d74; font-size: 8px; }
 .free-battle .online-lobby label { display: grid; gap: 7px; }
 .free-battle .online-lobby label span { color: #89a99e; font-size: 9px; font-weight: 700; }
 .free-battle .online-lobby input { min-width: 0; height: 43px; padding: 0 12px; border: 1px solid rgba(116,177,157,.3); border-radius: 8px; outline: 0; color: #effff9; background: rgba(3,20,16,.8); font: 700 12px var(--font-geist-mono), monospace; text-transform: uppercase; }
@@ -593,6 +616,8 @@
   .free-battle .match-size-select > div { grid-column: 1 / -1; text-align: center; }
   .free-battle .rank-account-card { grid-template-columns: 42px 1fr; }
   .free-battle .rank-account-card > button { min-height: 38px; }
+  .free-battle .room-list article { grid-template-columns: 64px 1fr 54px; }
+  .free-battle .room-occupancy { display: none; }
   .free-battle .ranking-row { grid-template-columns: 38px minmax(105px,1fr) 66px 58px; }
   .free-battle .ranking-row > small, .free-battle .ranking-row.heading > span:last-child { display: none; }
   .free-battle .account-modal, .free-battle .ranking-modal { padding: 28px 18px; }

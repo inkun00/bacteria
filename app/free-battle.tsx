@@ -201,8 +201,15 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const ranked = useRankedAccount();
   const settledMatchRef = useRef("");
   const gameInProgress = hydrated && gameStarted && !gameOver;
+  const refreshOnlineRooms = online.refreshRooms;
+  const openOnlineRoomCode = online.roomCode;
 
   usePreventGameUnload(gameInProgress);
+
+  useEffect(() => {
+    if (draftSettings.mode !== "online" || !ranked.profile || openOnlineRoomCode) return;
+    void refreshOnlineRooms();
+  }, [draftSettings.mode, openOnlineRoomCode, ranked.profile, refreshOnlineRooms]);
 
   useEffect(() => {
     const infectionSfx = new Audio(assetUrl("/assets/audio/infection-splat.ogg"));
@@ -809,6 +816,12 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     void online.joinRoom(onlineJoinCode, ranked.profile.displayName, ranked.profile.rating);
   };
 
+  const joinListedRoom = (code: string) => {
+    if (!ranked.profile) return;
+    setOnlineJoinCode(code);
+    void online.joinRoom(code, ranked.profile.displayName, ranked.profile.rating);
+  };
+
   const startOnlineBattle = () => {
     if (!online.isHost || !online.allConnected) return;
     const freshBoard = createBoard(draftSettings.boardSize);
@@ -1162,6 +1175,35 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                       <b>2 : 2</b><small>플레이어 4명</small>
                     </button>
                   </div>
+                )}
+                {!online.roomCode && ranked.profile && online.configured && (
+                  <section className="room-browser" aria-labelledby="room-browser-title">
+                    <header>
+                      <div>
+                        <b id="room-browser-title">참가 가능한 게임방</b>
+                        <small>{online.roomsRefreshedAt ? `${new Date(online.roomsRefreshedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 기준` : "현재 열려 있는 방을 확인하세요"}</small>
+                      </div>
+                      <button type="button" onClick={() => void online.refreshRooms()} disabled={online.roomsLoading}>
+                        <span aria-hidden="true">↻</span>{online.roomsLoading ? "불러오는 중" : "새로고침"}
+                      </button>
+                    </header>
+                    {online.roomsLoading && !online.availableRooms.length ? (
+                      <div className="room-browser-state">게임방 목록을 불러오는 중...</div>
+                    ) : online.availableRooms.length ? (
+                      <div className="room-list">
+                        {online.availableRooms.map((room) => (
+                          <article key={room.code} className={room.matchSize === 2 ? "duel" : "team"}>
+                            <div className="room-mode"><strong>{room.matchSize === 2 ? "1 : 1" : "2 : 2"}</strong><small>{room.boardSize}×{room.boardSize} 보드</small></div>
+                            <div className="room-host"><small>방장</small><b>{room.hostName}</b><span>MMR {room.hostRating}</span></div>
+                            <div className="room-occupancy"><small>참가 인원</small><b>{room.playerCount} / {room.matchSize}</b><span>{room.matchSize - room.playerCount}자리 남음</span></div>
+                            <button type="button" onClick={() => joinListedRoom(room.code)} disabled={online.status === "joining"}>참가</button>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="room-browser-state"><b>참가 가능한 방이 없습니다</b><span>새 방을 만들거나 새로고침 버튼을 눌러보세요.</span></div>
+                    )}
+                  </section>
                 )}
                 {!online.configured ? (
                   <div className="online-warning">

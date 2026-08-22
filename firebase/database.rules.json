@@ -3,6 +3,8 @@
     ".read": false,
     ".write": false,
     "rooms": {
+      ".read": "auth != null",
+      ".indexOn": ["status", "createdAt"],
       "$roomCode": {
         ".read": "auth != null",
         ".write": "auth != null",
