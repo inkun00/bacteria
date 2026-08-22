@@ -1073,7 +1073,18 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             </div>}
 
             {draftSettings.mode === "online" && (
-              <section className="online-lobby" aria-label="온라인 2대2 대전방">
+              <section className="online-lobby" aria-label="온라인 대전방">
+                {!online.roomCode && (
+                  <div className="match-size-select" role="group" aria-label="방을 만들 때 사용할 대전 인원">
+                    <div><span>대전 방식</span><small>새 방을 만들 때 적용됩니다</small></div>
+                    <button className={onlineMatchSize === 2 ? "selected" : ""} onClick={() => setOnlineMatchSize(2)}>
+                      <b>1 : 1</b><small>플레이어 2명</small>
+                    </button>
+                    <button className={onlineMatchSize === 4 ? "selected" : ""} onClick={() => setOnlineMatchSize(4)}>
+                      <b>2 : 2</b><small>플레이어 4명</small>
+                    </button>
+                  </div>
+                )}
                 {!online.configured ? (
                   <div className="online-warning">
                     <b>온라인 설정이 필요합니다</b>
@@ -1081,15 +1092,6 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                   </div>
                 ) : !online.roomCode ? (
                   <>
-                    <div className="match-size-select" role="group" aria-label="방을 만들 때 사용할 대전 인원">
-                      <div><span>대전 방식</span><small>새 방을 만들 때 적용됩니다</small></div>
-                      <button className={onlineMatchSize === 2 ? "selected" : ""} onClick={() => setOnlineMatchSize(2)}>
-                        <b>1 : 1</b><small>플레이어 2명</small>
-                      </button>
-                      <button className={onlineMatchSize === 4 ? "selected" : ""} onClick={() => setOnlineMatchSize(4)}>
-                        <b>2 : 2</b><small>플레이어 4명</small>
-                      </button>
-                    </div>
                     <label>
                       <span>표시 이름</span>
                       <input value={onlineName} maxLength={16} onChange={(event) => setOnlineName(event.target.value)} placeholder="연구원 이름" />
