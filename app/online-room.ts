@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from "firebase/auth";
 import {
+  get,
   getDatabase,
   onChildAdded,
   onDisconnect,
@@ -407,7 +408,10 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       const code = cleanCode(rawCode);
       if (code.length !== ROOM_CODE_LENGTH) throw new Error("6자리 방 코드를 입력해주세요.");
       const { database, uid } = await getServices();
-      const result = await runTransaction(ref(database, `rooms/${code}`), (current: RoomRecord | null) => {
+      const roomReference = ref(database, `rooms/${code}`);
+      const initialRoom = (await get(roomReference)).val() as RoomRecord | null;
+      if (!initialRoom || initialRoom.status !== "waiting") throw new Error("방을 찾을 수 없거나 이미 게임 중입니다.");
+      const result = await runTransaction(roomReference, (current: RoomRecord | null) => {
         if (!current || current.status !== "waiting") return;
         const currentPlayers = current.players ?? {};
         const roomMatchSize = current.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;

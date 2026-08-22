@@ -10,6 +10,8 @@ test("online 2v2 uses Firebase signaling and STUN-only WebRTC", async () => {
   assert.match(source, /rooms\/\$\{code\}\/signals/);
   assert.match(source, /OnlineMatchSize = 2 \| 4/);
   assert.match(source, /matchSize: requestedMatchSize/);
+  assert.match(source, /initialRoom = \(await get\(roomReference\)\)\.val\(\)/);
+  assert.match(source, /runTransaction\(roomReference/);
 });
 
 test("free battle exposes room creation, joining, and four connected slots", async () => {
