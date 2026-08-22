@@ -1,0 +1,25 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomCode": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['hostId', 'boardSize', 'status', 'players']) && newData.child('hostId').isString() && (newData.child('boardSize').val() == 7 || newData.child('boardSize').val() == 9 || newData.child('boardSize').val() == 11) && (newData.child('status').val() == 'waiting' || newData.child('status').val() == 'playing')",
+        "players": {
+          "$uid": {
+            ".validate": "newData.hasChildren(['name', 'slot']) && newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('slot').isNumber() && newData.child('slot').val() >= 0 && newData.child('slot').val() <= 3"
+          }
+        },
+        "signals": {
+          "$recipientUid": {
+            "$signalId": {
+              ".validate": "newData.hasChild('from') && newData.child('from').isString()"
+            }
+          }
+        }
+      }
+    }
+  }
+}

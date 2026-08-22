@@ -11,12 +11,13 @@
     "build:pages": "vinext build",
     "build:vercel": "vite build",
     "start": "vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/boss-logic.test.mjs tests/hall-of-fame.test.mjs tests/worksheet.test.mjs",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/boss-logic.test.mjs tests/hall-of-fame.test.mjs tests/worksheet.test.mjs tests/online-room.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
+    "firebase": "^12.18.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "react": "19.2.6",

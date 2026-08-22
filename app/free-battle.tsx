@@ -2,6 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { assetUrl } from "./assets";
 import { GameExitPrompt, usePreventGameUnload } from "./game-navigation";
 import {
+  teamForSlot,
+  useOnlineRoom,
+  type OnlineGameMessage,
+  type OnlineMoveResult,
+} from "./online-room";
+import {
   applyMove,
   chooseAiAction,
   compositeNumberAt,
@@ -21,7 +27,7 @@ import {
   type RelationMode,
 } from "./game";
 
-type Mode = "ai" | "local";
+type Mode = "ai" | "local" | "online";
 type Settings = { mode: Mode; difficulty: Difficulty; boardSize: BoardSize };
 type Snapshot = {
   board: Cell[];
@@ -93,7 +99,7 @@ function nextMode(mode: RelationMode): RelationMode {
 }
 
 function normalizeSettings(value: Partial<Settings> | undefined, fallbackSize: BoardSize = 7): Settings {
-  const mode: Mode = value?.mode === "local" ? "local" : "ai";
+  const mode: Mode = value?.mode === "local" || value?.mode === "online" ? value.mode : "ai";
   const difficulty: Difficulty = value?.difficulty === "easy" || value?.difficulty === "hard" ? value.difficulty : "medium";
   const boardSize = BOARD_SIZES.includes(value?.boardSize as BoardSize) ? value?.boardSize as BoardSize : fallbackSize;
   return { mode, difficulty, boardSize };
@@ -168,10 +174,18 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [projectiles, setProjectiles] = useState<InfectionProjectile[]>([]);
   const [arrived, setArrived] = useState<number | null>(null);
   const [notice, setNotice] = useState("내 세균을 고른 뒤 약수·배수·분열 중 하나를 선택하세요");
+  const [onlineName, setOnlineName] = useState("연구원");
+  const [onlineJoinCode, setOnlineJoinCode] = useState("");
+  const [activeSlot, setActiveSlot] = useState(0);
   const audioRef = useRef<AudioContext | null>(null);
   const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
   const sequenceTimers = useRef<number[]>([]);
   const animationWatchdog = useRef<number | null>(null);
+  const handledOnlineRequests = useRef(new Set<string>());
+  const onlineMessageHandlerRef = useRef<(message: OnlineGameMessage, senderUid: string) => void>(() => undefined);
+  const online = useOnlineRoom(useCallback((message: OnlineGameMessage, senderUid: string) => {
+    onlineMessageHandlerRef.current(message, senderUid);
+  }, []));
   const gameInProgress = hydrated && gameStarted && !gameOver;
 
   usePreventGameUnload(gameInProgress);
@@ -350,7 +364,13 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     }
   }, [playTone, settings.mode]);
 
-  const executeMove = useCallback((move: Move, player: Player, mode: RelationMode = relationMode, useBomb = false) => {
+  const executeMove = useCallback((
+    move: Move,
+    player: Player,
+    mode: RelationMode = relationMode,
+    useBomb = false,
+    authoritativeResult?: OnlineMoveResult,
+  ) => {
     if (gameOver || animating || restartPromptOpen || exitPromptOpen) return;
     clearSequenceTimers();
     setAnimating(true);
@@ -364,7 +384,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       bombCharge: [...bombCharge] as [number, number],
       relationMode,
     }]);
-    const result = applyMove(board, numbers, player, move, mode, { forceInfection: useBomb });
+    const result = authoritativeResult ?? applyMove(board, numbers, player, move, mode, { forceInfection: useBomb });
     let infectionCommitted = false;
     const commitInfection = () => {
       if (!result.infected.length || infectionCommitted) return;
@@ -524,6 +544,11 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
 
   useEffect(() => {
     if (!hydrated || animating) return;
+    if (settings.mode === "online") {
+      window.localStorage.removeItem(SAVED_GAME_KEY);
+      window.sessionStorage.removeItem(SAVED_GAME_KEY);
+      return;
+    }
     const saved: SavedGame = {
       version: 1,
       started: gameStarted,
@@ -553,21 +578,28 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       if (event.key !== "Escape" || setupOpen || gameOver) return;
       event.preventDefault();
       setRulesOpen(false);
+      if (settings.mode === "online") {
+        setExitPromptOpen(true);
+        return;
+      }
       setRestartReason("escape");
       setRestartPromptOpen(true);
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [gameOver, setupOpen]);
+  }, [gameOver, settings.mode, setupOpen]);
 
-  const startGame = useCallback((nextSettings = draftSettings) => {
+  const startGame = useCallback((
+    nextSettings = draftSettings,
+    initial?: { board: Cell[]; numbers: NumberCell[] },
+  ) => {
     clearSequenceTimers();
     const normalizedSettings = normalizeSettings(nextSettings);
-    const freshBoard = createBoard(normalizedSettings.boardSize);
+    const freshBoard = initial?.board ?? createBoard(normalizedSettings.boardSize);
     setSettings(normalizedSettings);
     setDraftSettings(normalizedSettings);
     setBoard(freshBoard);
-    setNumbers(createNumbers(freshBoard));
+    setNumbers(initial?.numbers ?? createNumbers(freshBoard));
     setCurrentPlayer(1);
     setSelected(null);
     setHovered(null);
@@ -594,28 +626,109 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     setSetupOpen(false);
   }, [clearSequenceTimers, draftSettings]);
 
+  useEffect(() => {
+    onlineMessageHandlerRef.current = (message, senderUid) => {
+      const hostUid = online.players.find((player) => player.slot === 0)?.uid;
+      if (message.kind === "start") {
+        if (!online.isHost && senderUid !== hostUid) return;
+        setActiveSlot(message.activeSlot);
+        handledOnlineRequests.current.clear();
+        startGame(
+          { mode: "online", difficulty: "medium", boardSize: message.boardSize },
+          { board: message.board, numbers: message.numbers },
+        );
+        return;
+      }
+
+      if (message.kind === "move-request") {
+        if (!online.isHost || handledOnlineRequests.current.has(message.requestId)) return;
+        const actor = online.players.find((player) => player.slot === activeSlot);
+        if (!actor || actor.uid !== senderUid || animating || gameOver) return;
+        const player = teamForSlot(activeSlot);
+        if (player !== currentPlayer || board[message.move.from] !== player) return;
+        const allowed = legalMoves(board, player).some((move) =>
+          move.from === message.move.from
+          && move.to === message.move.to
+          && move.distance === message.move.distance,
+        );
+        if (!allowed || (message.mode === "split" && message.move.distance !== 1)) return;
+        if (message.useBomb && bombs[player - 1] <= 0) return;
+        handledOnlineRequests.current.add(message.requestId);
+        const result = applyMove(board, numbers, player, message.move, message.mode, { forceInfection: message.useBomb });
+        let nextSlot = activeSlot;
+        for (let offset = 1; offset <= 4; offset += 1) {
+          const candidate = (activeSlot + offset) % 4;
+          if (legalMoves(result.board, teamForSlot(candidate)).length) {
+            nextSlot = candidate;
+            break;
+          }
+        }
+        void online.broadcast({
+          kind: "move",
+          requestId: message.requestId,
+          actorSlot: activeSlot,
+          player,
+          move: message.move,
+          mode: message.mode,
+          useBomb: message.useBomb,
+          nextSlot,
+          result,
+        });
+        return;
+      }
+
+      if (message.kind === "move") {
+        if (handledOnlineRequests.current.has(`done:${message.requestId}`)) return;
+        if (!online.isHost && senderUid !== hostUid) return;
+        handledOnlineRequests.current.add(`done:${message.requestId}`);
+        setActiveSlot(message.nextSlot);
+        executeMove(message.move, message.player, message.mode, message.useBomb, message.result);
+      }
+    };
+    return () => {
+      onlineMessageHandlerRef.current = () => undefined;
+    };
+  }, [activeSlot, animating, board, bombs, currentPlayer, executeMove, gameOver, numbers, online, startGame]);
+
   const requestExit = useCallback(() => {
     if (gameInProgress) {
       setRulesOpen(false);
       setExitPromptOpen(true);
       return;
     }
+    if (online.roomCode) void online.leave();
     onExit();
-  }, [gameInProgress, onExit]);
+  }, [gameInProgress, onExit, online]);
 
   const stopAndExit = useCallback(() => {
     window.localStorage.removeItem(SAVED_GAME_KEY);
     window.sessionStorage.removeItem(SAVED_GAME_KEY);
+    if (settings.mode === "online") void online.leave();
     setGameStarted(false);
     setExitPromptOpen(false);
     onExit();
-  }, [onExit]);
+  }, [onExit, online, settings.mode]);
 
   const handleCell = (index: number) => {
     if (gameOver || restartPromptOpen || exitPromptOpen || thinking || animating || (settings.mode === "ai" && currentPlayer === 2)) return;
+    if (settings.mode === "online" && online.localSlot !== activeSlot) {
+      const activePlayer = online.players.find((player) => player.slot === activeSlot);
+      setNotice(`${activePlayer?.name ?? "팀원"}님의 차례를 기다리고 있어요`);
+      return;
+    }
     const move = targetMap.get(index);
     if (move) {
-      executeMove(move, currentPlayer, relationMode, bombArmed);
+      if (settings.mode === "online") {
+        online.sendToHost({
+          kind: "move-request",
+          requestId: crypto.randomUUID(),
+          move,
+          mode: relationMode,
+          useBomb: bombArmed,
+        });
+      } else {
+        executeMove(move, currentPlayer, relationMode, bombArmed);
+      }
       return;
     }
     if (board[index] === currentPlayer) {
@@ -639,7 +752,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   };
 
   const undo = () => {
-    if (!history.length || restartPromptOpen || exitPromptOpen || thinking || animating) return;
+    if (settings.mode === "online" || !history.length || restartPromptOpen || exitPromptOpen || thinking || animating) return;
     const steps = settings.mode === "ai" ? Math.min(2, history.length) : 1;
     const snapshot = history[history.length - steps];
     setBoard(snapshot.board);
@@ -662,10 +775,36 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     setNotice("한 수 전으로 되돌렸어요");
   };
 
-  const playerTwoName = settings.mode === "ai" ? "컴퓨터" : "플레이어 2";
-  const activeName = currentPlayer === 1 ? "플레이어 1" : playerTwoName;
+  const createOnlineRoom = () => {
+    void online.createRoom(onlineName, draftSettings.boardSize);
+  };
+
+  const joinOnlineRoom = () => {
+    void online.joinRoom(onlineJoinCode, onlineName);
+  };
+
+  const startOnlineBattle = () => {
+    if (!online.isHost || !online.allConnected) return;
+    const freshBoard = createBoard(draftSettings.boardSize);
+    void online.broadcast({
+      kind: "start",
+      board: freshBoard,
+      numbers: createNumbers(freshBoard),
+      boardSize: draftSettings.boardSize,
+      activeSlot: 0,
+    });
+  };
+
+  const blueOnlineNames = online.players.filter((player) => teamForSlot(player.slot) === 1).map((player) => player.name).join(" · ");
+  const redOnlineNames = online.players.filter((player) => teamForSlot(player.slot) === 2).map((player) => player.name).join(" · ");
+  const playerTwoName = settings.mode === "ai" ? "컴퓨터" : settings.mode === "online" ? redOnlineNames || "빨간 팀" : "플레이어 2";
+  const activeName = settings.mode === "online"
+    ? online.players.find((player) => player.slot === activeSlot)?.name ?? "온라인 플레이어"
+    : currentPlayer === 1 ? "플레이어 1" : playerTwoName;
   const gameLabel = settings.mode === "ai"
     ? `컴퓨터 · ${DIFFICULTY[settings.difficulty].label} · ${boardSize}×${boardSize}`
+    : settings.mode === "online"
+    ? `온라인 2:2 · ${online.roomCode} · ${boardSize}×${boardSize}`
     : `친구와 하기 · ${boardSize}×${boardSize}`;
   const displayedCharge: [number, number] = [
     chargeBurst === 1 ? 5 : bombCharge[0],
@@ -690,7 +829,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         <nav className="top-actions" aria-label="게임 메뉴">
           <button onClick={() => setSoundOn((value) => !value)} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "◖))" : "◖×"}</button>
           <button onClick={() => setRulesOpen(true)} aria-label="게임 규칙 보기">?</button>
-          <button className="mode-button" onClick={() => setSetupOpen(true)}><span>{gameLabel}</span><b>변경</b></button>
+          <button className="mode-button" onClick={() => {
+            if (settings.mode === "online") void online.leave();
+            setSetupOpen(true);
+          }}><span>{gameLabel}</span><b>변경</b></button>
         </nav>
       </header>
 
@@ -711,7 +853,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         <aside className={`player-panel cyan ${currentPlayer === 1 && !gameOver ? "active" : ""}`}>
           <div className="player-topline"><span>파란 팀</span><i>● 준비됨</i></div>
           <div className="portrait"><Germ player={1} /><span className="scanline" /></div>
-          <div className="identity"><small>내 세균</small><h2>플레이어 1</h2></div>
+          <div className="identity"><small>{settings.mode === "online" ? "온라인 파란 팀" : "내 세균"}</small><h2>{settings.mode === "online" ? blueOnlineNames || "파란 팀" : "플레이어 1"}</h2></div>
           <div className="score-block"><small>세균 수</small><strong>{String(scores[0]).padStart(2, "0")}</strong></div>
           <div className="player-metrics">
             <span><small>감염</small><b>+{captures[0]}</b></span>
@@ -801,7 +943,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
           </div>
 
           <div className="board-controls">
-            <button onClick={undo} disabled={!history.length || thinking || animating}><span>↶</span> 되돌리기</button>
+            <button onClick={undo} disabled={settings.mode === "online" || !history.length || thinking || animating}><span>↶</span> 되돌리기</button>
             <div className="tactic-controls">
               {selected !== null ? (
                 <button className={`relation-readout ${relationMode}`} onClick={() => handleCell(selected)}>
@@ -814,7 +956,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
               )}
               <button
                 className={`bacteria-bomb ${bombArmed ? "armed" : ""}`}
-                disabled={selected === null || bombs[currentPlayer - 1] === 0 || thinking || animating}
+                disabled={selected === null || bombs[currentPlayer - 1] === 0 || thinking || animating || (settings.mode === "online" && online.localSlot !== activeSlot)}
                 onClick={() => {
                   const next = !bombArmed;
                   setBombArmed(next);
@@ -829,6 +971,11 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
               </button>
             </div>
             <button onClick={() => {
+              if (settings.mode === "online") {
+                if (online.isHost) startOnlineBattle();
+                else setNotice("온라인 대전은 방장만 다시 시작할 수 있어요");
+                return;
+              }
               setRestartReason("manual");
               setRestartPromptOpen(true);
             }}><span>↻</span> 새 게임</button>
@@ -836,9 +983,9 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         </section>
 
         <aside className={`player-panel coral ${currentPlayer === 2 && !gameOver ? "active" : ""}`}>
-          <div className="player-topline"><span>빨간 팀</span><i>● {settings.mode === "ai" ? "컴퓨터" : "준비됨"}</i></div>
+          <div className="player-topline"><span>빨간 팀</span><i>● {settings.mode === "ai" ? "컴퓨터" : settings.mode === "online" ? "온라인" : "준비됨"}</i></div>
           <div className="portrait"><Germ player={2} /><span className="scanline" /></div>
-          <div className="identity"><small>{settings.mode === "ai" ? "컴퓨터 세균" : "상대 세균"}</small><h2>{playerTwoName}</h2></div>
+          <div className="identity"><small>{settings.mode === "ai" ? "컴퓨터 세균" : settings.mode === "online" ? "온라인 상대 팀" : "상대 세균"}</small><h2>{playerTwoName}</h2></div>
           <div className="score-block"><small>세균 수</small><strong>{String(scores[1]).padStart(2, "0")}</strong></div>
           <div className="player-metrics">
             <span><small>감염</small><b>+{captures[1]}</b></span>
@@ -890,6 +1037,9 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
               <button className={draftSettings.mode === "local" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "local" }))}>
                 <span className="tab-icon">◎</span><span><b>친구와 하기</b><small>한 화면에서 둘이 해요</small></span>
               </button>
+              <button className={draftSettings.mode === "online" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "online" }))}>
+                <span className="tab-icon">⌁</span><span><b>온라인 2:2</b><small>방 코드로 네 명이 대전해요</small></span>
+              </button>
             </div>
 
             <div className="board-size-select">
@@ -908,7 +1058,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
               </div>
             </div>
 
-            <div className={`difficulty-select ${draftSettings.mode === "local" ? "disabled" : ""}`}>
+            {draftSettings.mode !== "online" && <div className={`difficulty-select ${draftSettings.mode === "local" ? "disabled" : ""}`}>
               <div className="select-heading"><span>컴퓨터 난이도</span><small>{draftSettings.mode === "local" ? "친구와 할 때는 사용하지 않아요" : "어려운 정도를 고르세요"}</small></div>
               <div className="difficulty-grid">
                 {(Object.keys(DIFFICULTY) as Difficulty[]).map((level) => (
@@ -918,9 +1068,69 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
 
-            <button className="launch-button" onClick={() => startGame()}><span>게임 시작</span><i>→</i></button>
+            {draftSettings.mode === "online" && (
+              <section className="online-lobby" aria-label="온라인 2대2 대전방">
+                {!online.configured ? (
+                  <div className="online-warning">
+                    <b>온라인 설정이 필요합니다</b>
+                    <p>Firebase 프로젝트 값을 환경 설정에 등록하면 방을 만들 수 있습니다.</p>
+                  </div>
+                ) : !online.roomCode ? (
+                  <>
+                    <label>
+                      <span>표시 이름</span>
+                      <input value={onlineName} maxLength={16} onChange={(event) => setOnlineName(event.target.value)} placeholder="연구원 이름" />
+                    </label>
+                    <div className="online-entry-actions">
+                      <button onClick={createOnlineRoom} disabled={online.status === "joining"}>
+                        <b>새 방 만들기</b><small>내가 방장이 됩니다</small>
+                      </button>
+                      <div>
+                        <input
+                          value={onlineJoinCode}
+                          maxLength={6}
+                          onChange={(event) => setOnlineJoinCode(event.target.value.toUpperCase().replace(/[^A-Z2-9]/g, ""))}
+                          placeholder="방 코드 6자리"
+                          aria-label="참가할 방 코드"
+                        />
+                        <button onClick={joinOnlineRoom} disabled={online.status === "joining" || onlineJoinCode.length !== 6}>참가</button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="room-code-card">
+                      <span>방 코드</span><strong>{online.roomCode}</strong>
+                      <button onClick={() => void navigator.clipboard?.writeText(online.roomCode)}>복사</button>
+                    </div>
+                    <div className="online-slots">
+                      {[0, 1, 2, 3].map((slot) => {
+                        const player = online.players.find((candidate) => candidate.slot === slot);
+                        return (
+                          <div key={slot} className={`${teamForSlot(slot) === 1 ? "blue" : "red"} ${player?.connected ? "connected" : ""}`}>
+                            <span>{teamForSlot(slot) === 1 ? "파란" : "빨간"} 팀 · {Math.floor(slot / 2) + 1}</span>
+                            <b>{player?.name ?? "기다리는 중"}</b>
+                            <small>{player ? player.connected ? "직접 연결됨" : "연결 중" : "빈 자리"}</small>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="direct-only-note">TURN 없이 직접 연결만 사용합니다. 연결되지 않으면 다른 네트워크에서 다시 참가해주세요.</p>
+                    {online.isHost ? (
+                      <button className="online-start" onClick={startOnlineBattle} disabled={!online.allConnected}>네 명 모두 연결되면 대전 시작</button>
+                    ) : (
+                      <div className="online-waiting">방장이 대전을 시작하기를 기다리고 있어요</div>
+                    )}
+                    <button className="online-leave" onClick={() => void online.leave()}>방 나가기</button>
+                  </>
+                )}
+                {online.error && <p className="online-error" role="alert">{online.error}</p>}
+              </section>
+            )}
+
+            {draftSettings.mode !== "online" && <button className="launch-button" onClick={() => startGame()}><span>게임 시작</span><i>→</i></button>}
             <button className="free-exit-button" onClick={requestExit}>← 게임 시작 화면</button>
             <button className="rules-link" onClick={() => setRulesOpen(true)}>게임 규칙 보기 <span>?</span></button>
           </section>
@@ -983,7 +1193,17 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             <h2>{winner === 0 ? "무승부" : `${winner === 1 ? "파란" : "빨간"} 팀 승리`}</h2>
             <p>{scores[0]} <i>:</i> {scores[1]}</p>
             <small>{moveNumber - 1}번 움직임 · {formatTime(elapsed)}</small>
-            <div><button onClick={() => startGame(settings)}>다시 하기</button><button onClick={() => setSetupOpen(true)}>설정 바꾸기</button></div>
+            <div>
+              <button onClick={() => {
+                if (settings.mode !== "online") startGame(settings);
+                else if (online.isHost) startOnlineBattle();
+                else setNotice("방장이 다시 시작하기를 기다리고 있어요");
+              }}>{settings.mode === "online" && !online.isHost ? "방장 기다리기" : "다시 하기"}</button>
+              <button onClick={() => {
+                if (settings.mode === "online") void online.leave();
+                setSetupOpen(true);
+              }}>설정 바꾸기</button>
+            </div>
           </section>
         </div>
       )}

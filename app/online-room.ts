@@ -1,0 +1,493 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from "firebase/auth";
+import {
+  getDatabase,
+  onChildAdded,
+  onDisconnect,
+  onValue,
+  push,
+  ref,
+  remove,
+  runTransaction,
+  serverTimestamp,
+  set,
+  type Database,
+  type Unsubscribe,
+} from "firebase/database";
+import type { BoardSize, Cell, Move, NumberCell, Player, RelationMode } from "./game";
+
+export type OnlinePlayer = {
+  uid: string;
+  name: string;
+  slot: number;
+  connected: boolean;
+};
+
+export type OnlineMoveResult = {
+  board: Cell[];
+  numbers: NumberCell[];
+  infected: number[];
+  resisted: number[];
+  attackerNumber: number;
+  infectionNumber: number;
+  parentNumber: number;
+  spawnedNumber: number;
+};
+
+export type OnlineGameMessage =
+  | {
+      kind: "start";
+      board: Cell[];
+      numbers: NumberCell[];
+      boardSize: BoardSize;
+      activeSlot: number;
+    }
+  | {
+      kind: "move-request";
+      requestId: string;
+      move: Move;
+      mode: RelationMode;
+      useBomb: boolean;
+    }
+  | {
+      kind: "move";
+      requestId: string;
+      actorSlot: number;
+      player: Player;
+      move: Move;
+      mode: RelationMode;
+      useBomb: boolean;
+      nextSlot: number;
+      result: OnlineMoveResult;
+    };
+
+type RoomRecord = {
+  hostId?: string;
+  boardSize?: BoardSize;
+  status?: "waiting" | "playing";
+  players?: Record<string, Omit<OnlinePlayer, "uid" | "connected"> & { joinedAt?: number }>;
+};
+
+type SignalRecord = {
+  from: string;
+  description?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+};
+
+type OnlineRoomStatus = "idle" | "joining" | "waiting" | "connecting" | "ready" | "playing" | "disconnected" | "error";
+
+const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const ROOM_CODE_LENGTH = 6;
+const MAX_PLAYERS = 4;
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+];
+
+function firebaseConfig() {
+  const config = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  };
+  return Object.values(config).every(Boolean) ? config as Record<keyof typeof config, string> : null;
+}
+
+function createRoomCode() {
+  const random = new Uint32Array(ROOM_CODE_LENGTH);
+  crypto.getRandomValues(random);
+  return Array.from(random, (value) => ROOM_ALPHABET[value % ROOM_ALPHABET.length]).join("");
+}
+
+function cleanName(value: string) {
+  return value.trim().replace(/\s+/g, " ").slice(0, 16) || "익명 연구원";
+}
+
+function cleanCode(value: string) {
+  return value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, ROOM_CODE_LENGTH);
+}
+
+async function waitForUser(auth: Auth) {
+  if (auth.currentUser) return auth.currentUser;
+  await signInAnonymously(auth);
+  if (auth.currentUser) return auth.currentUser;
+  return await new Promise<NonNullable<Auth["currentUser"]>>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      unsubscribe();
+      reject(new Error("로그인 시간이 초과되었습니다."));
+    }, 10_000);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) return;
+      window.clearTimeout(timeout);
+      unsubscribe();
+      resolve(user);
+    }, reject);
+  });
+}
+
+export function teamForSlot(slot: number): Player {
+  return slot % 2 === 0 ? 1 : 2;
+}
+
+export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid: string) => void) {
+  const config = useMemo(() => firebaseConfig(), []);
+  const [status, setStatus] = useState<OnlineRoomStatus>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState("");
+  const [players, setPlayers] = useState<OnlinePlayer[]>([]);
+  const [localUid, setLocalUid] = useState("");
+  const [hostUid, setHostUid] = useState("");
+  const [localSlot, setLocalSlot] = useState<number | null>(null);
+  const [roomBoardSize, setRoomBoardSize] = useState<BoardSize>(7);
+  const appRef = useRef<FirebaseApp | null>(null);
+  const databaseRef = useRef<Database | null>(null);
+  const roomCodeRef = useRef("");
+  const localUidRef = useRef("");
+  const hostUidRef = useRef("");
+  const localSlotRef = useRef<number | null>(null);
+  const isHostRef = useRef(false);
+  const peerConnections = useRef(new Map<string, RTCPeerConnection>());
+  const dataChannels = useRef(new Map<string, RTCDataChannel>());
+  const pendingCandidates = useRef(new Map<string, RTCIceCandidateInit[]>());
+  const offeredPeers = useRef(new Set<string>());
+  const unsubscribes = useRef<Unsubscribe[]>([]);
+  const onMessageRef = useRef(onMessage);
+  const leavingRef = useRef(false);
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
+
+  const refreshPlayerConnections = useCallback(() => {
+    setPlayers((current) => current.map((player) => ({
+      ...player,
+      connected: player.uid === localUidRef.current
+        || dataChannels.current.get(player.uid)?.readyState === "open",
+    })));
+  }, []);
+
+  const updateReadyStatus = useCallback(() => {
+    const openChannels = [...dataChannels.current.values()].filter((channel) => channel.readyState === "open").length;
+    if (isHostRef.current) {
+      setStatus(players.length === MAX_PLAYERS && openChannels === MAX_PLAYERS - 1 ? "ready" : openChannels ? "connecting" : "waiting");
+    } else {
+      setStatus(openChannels === 1 ? "ready" : "connecting");
+    }
+  }, [players.length]);
+
+  const sendSignal = useCallback(async (recipientUid: string, signal: Omit<SignalRecord, "from">) => {
+    const database = databaseRef.current;
+    const code = roomCodeRef.current;
+    const uid = localUidRef.current;
+    if (!database || !code || !uid) return;
+    await push(ref(database, `rooms/${code}/signals/${recipientUid}`), { from: uid, ...signal });
+  }, []);
+
+  const wireChannel = useCallback((peerUid: string, channel: RTCDataChannel) => {
+    dataChannels.current.set(peerUid, channel);
+    channel.onopen = () => {
+      refreshPlayerConnections();
+      updateReadyStatus();
+    };
+    channel.onclose = () => {
+      refreshPlayerConnections();
+      setStatus("disconnected");
+      setError("플레이어와 직접 연결이 끊어졌습니다. TURN을 사용하지 않아 자동 우회 연결은 제공되지 않습니다.");
+    };
+    channel.onerror = () => {
+      setStatus("error");
+      setError("WebRTC 직접 연결 중 오류가 발생했습니다.");
+    };
+    channel.onmessage = (event) => {
+      try {
+        const message = JSON.parse(String(event.data)) as OnlineGameMessage;
+        onMessageRef.current(message, peerUid);
+      } catch {
+        setError("받은 게임 데이터를 해석할 수 없습니다.");
+      }
+    };
+  }, [refreshPlayerConnections, updateReadyStatus]);
+
+  const createPeerConnection = useCallback((peerUid: string) => {
+    const existing = peerConnections.current.get(peerUid);
+    if (existing) return existing;
+    const connection = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceTransportPolicy: "all" });
+    peerConnections.current.set(peerUid, connection);
+    connection.onicecandidate = (event) => {
+      if (event.candidate) void sendSignal(peerUid, { candidate: event.candidate.toJSON() });
+    };
+    connection.onconnectionstatechange = () => {
+      if (connection.connectionState === "failed") {
+        setStatus("error");
+        setError("이 네트워크에서는 직접 연결할 수 없습니다. 다른 Wi-Fi나 네트워크에서 다시 시도해주세요.");
+      }
+      if (connection.connectionState === "disconnected" || connection.connectionState === "closed") {
+        refreshPlayerConnections();
+      }
+    };
+    connection.ondatachannel = (event) => wireChannel(peerUid, event.channel);
+    return connection;
+  }, [refreshPlayerConnections, sendSignal, wireChannel]);
+
+  const flushCandidates = useCallback(async (peerUid: string, connection: RTCPeerConnection) => {
+    const candidates = pendingCandidates.current.get(peerUid) ?? [];
+    pendingCandidates.current.delete(peerUid);
+    for (const candidate of candidates) await connection.addIceCandidate(candidate);
+  }, []);
+
+  const handleSignal = useCallback(async (signalKey: string, signal: SignalRecord) => {
+    const database = databaseRef.current;
+    const code = roomCodeRef.current;
+    const uid = localUidRef.current;
+    if (!database || !code || !uid || signal.from === uid) return;
+    try {
+      const connection = createPeerConnection(signal.from);
+      if (signal.description?.type === "offer") {
+        await connection.setRemoteDescription(signal.description);
+        await flushCandidates(signal.from, connection);
+        const answer = await connection.createAnswer();
+        await connection.setLocalDescription(answer);
+        await sendSignal(signal.from, { description: answer });
+      } else if (signal.description?.type === "answer") {
+        await connection.setRemoteDescription(signal.description);
+        await flushCandidates(signal.from, connection);
+      } else if (signal.candidate) {
+        if (connection.remoteDescription) await connection.addIceCandidate(signal.candidate);
+        else pendingCandidates.current.set(signal.from, [...(pendingCandidates.current.get(signal.from) ?? []), signal.candidate]);
+      }
+    } finally {
+      await remove(ref(database, `rooms/${code}/signals/${uid}/${signalKey}`));
+    }
+  }, [createPeerConnection, flushCandidates, sendSignal]);
+
+  const offerToPeer = useCallback(async (peerUid: string) => {
+    if (offeredPeers.current.has(peerUid)) return;
+    offeredPeers.current.add(peerUid);
+    const connection = createPeerConnection(peerUid);
+    const channel = connection.createDataChannel("factor-force", { ordered: true });
+    wireChannel(peerUid, channel);
+    const offer = await connection.createOffer();
+    await connection.setLocalDescription(offer);
+    await sendSignal(peerUid, { description: offer });
+  }, [createPeerConnection, sendSignal, wireChannel]);
+
+  const getServices = useCallback(async () => {
+    if (!config) throw new Error("Firebase 환경 설정이 없습니다. .env.local을 설정해주세요.");
+    const app = appRef.current ?? (getApps().length ? getApp() : initializeApp(config));
+    appRef.current = app;
+    const auth = getAuth(app);
+    const database = getDatabase(app);
+    databaseRef.current = database;
+    const user = await waitForUser(auth);
+    localUidRef.current = user.uid;
+    setLocalUid(user.uid);
+    return { database, uid: user.uid };
+  }, [config]);
+
+  const subscribeToRoom = useCallback((database: Database, code: string, uid: string) => {
+    unsubscribes.current.push(onValue(ref(database, `rooms/${code}`), (snapshot) => {
+      const room = snapshot.val() as RoomRecord | null;
+      if (!room) {
+        if (!leavingRef.current) {
+          setStatus("disconnected");
+          setError("방이 종료되었거나 호스트 연결이 끊어졌습니다.");
+        }
+        return;
+      }
+      const nextPlayers = Object.entries(room.players ?? {})
+        .map(([playerUid, player]) => ({
+          uid: playerUid,
+          name: player.name,
+          slot: player.slot,
+          connected: playerUid === uid || dataChannels.current.get(playerUid)?.readyState === "open",
+        }))
+        .sort((left, right) => left.slot - right.slot);
+      setPlayers(nextPlayers);
+      setRoomBoardSize(room.boardSize ?? 7);
+      hostUidRef.current = room.hostId ?? "";
+      setHostUid(room.hostId ?? "");
+      const mine = nextPlayers.find((player) => player.uid === uid);
+      localSlotRef.current = mine?.slot ?? null;
+      setLocalSlot(mine?.slot ?? null);
+      isHostRef.current = room.hostId === uid;
+      if (room.status === "playing") setStatus("playing");
+      if (room.hostId === uid) {
+        nextPlayers.filter((player) => player.uid !== uid).forEach((player) => void offerToPeer(player.uid));
+      }
+    }));
+    unsubscribes.current.push(onChildAdded(ref(database, `rooms/${code}/signals/${uid}`), (snapshot) => {
+      const signal = snapshot.val() as SignalRecord;
+      if (signal) void handleSignal(snapshot.key ?? "", signal);
+    }));
+  }, [handleSignal, offerToPeer]);
+
+  const leave = useCallback(async () => {
+    leavingRef.current = true;
+    unsubscribes.current.forEach((unsubscribe) => unsubscribe());
+    unsubscribes.current = [];
+    dataChannels.current.forEach((channel) => channel.close());
+    peerConnections.current.forEach((connection) => connection.close());
+    dataChannels.current.clear();
+    peerConnections.current.clear();
+    pendingCandidates.current.clear();
+    offeredPeers.current.clear();
+    const database = databaseRef.current;
+    const code = roomCodeRef.current;
+    const uid = localUidRef.current;
+    if (database && code && uid) {
+      if (isHostRef.current) await remove(ref(database, `rooms/${code}`)).catch(() => undefined);
+      else await remove(ref(database, `rooms/${code}/players/${uid}`)).catch(() => undefined);
+    }
+    roomCodeRef.current = "";
+    hostUidRef.current = "";
+    localSlotRef.current = null;
+    isHostRef.current = false;
+    setRoomCode("");
+    setPlayers([]);
+    setHostUid("");
+    setLocalSlot(null);
+    setStatus("idle");
+    setError(null);
+    leavingRef.current = false;
+  }, []);
+
+  const createRoom = useCallback(async (name: string, boardSize: BoardSize) => {
+    await leave();
+    setStatus("joining");
+    setError(null);
+    try {
+      const { database, uid } = await getServices();
+      let code = "";
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const candidate = createRoomCode();
+        const result = await runTransaction(ref(database, `rooms/${candidate}`), (current) => current === null ? {
+          hostId: uid,
+          boardSize,
+          status: "waiting",
+          createdAt: serverTimestamp(),
+          players: { [uid]: { name: cleanName(name), slot: 0, joinedAt: serverTimestamp() } },
+        } : undefined, { applyLocally: false });
+        if (result.committed) {
+          code = candidate;
+          break;
+        }
+      }
+      if (!code) throw new Error("방 코드를 만들지 못했습니다. 다시 시도해주세요.");
+      roomCodeRef.current = code;
+      hostUidRef.current = uid;
+      localSlotRef.current = 0;
+      isHostRef.current = true;
+      setRoomCode(code);
+      setHostUid(uid);
+      setLocalSlot(0);
+      setRoomBoardSize(boardSize);
+      subscribeToRoom(database, code, uid);
+      await onDisconnect(ref(database, `rooms/${code}`)).remove();
+      setStatus("waiting");
+    } catch (reason) {
+      setStatus("error");
+      setError(reason instanceof Error ? reason.message : "방을 만들지 못했습니다.");
+    }
+  }, [getServices, leave, subscribeToRoom]);
+
+  const joinRoom = useCallback(async (rawCode: string, name: string) => {
+    await leave();
+    setStatus("joining");
+    setError(null);
+    try {
+      const code = cleanCode(rawCode);
+      if (code.length !== ROOM_CODE_LENGTH) throw new Error("6자리 방 코드를 입력해주세요.");
+      const { database, uid } = await getServices();
+      const result = await runTransaction(ref(database, `rooms/${code}`), (current: RoomRecord | null) => {
+        if (!current || current.status !== "waiting") return;
+        const currentPlayers = current.players ?? {};
+        if (currentPlayers[uid]) return current;
+        const usedSlots = new Set(Object.values(currentPlayers).map((player) => player.slot));
+        const slot = [1, 2, 3].find((candidate) => !usedSlots.has(candidate));
+        if (slot === undefined) return;
+        return {
+          ...current,
+          players: {
+            ...currentPlayers,
+            [uid]: { name: cleanName(name), slot, joinedAt: serverTimestamp() },
+          },
+        };
+      }, { applyLocally: false });
+      const room = result.snapshot.val() as RoomRecord | null;
+      if (!result.committed || !room?.players?.[uid]) throw new Error("방을 찾을 수 없거나 이미 가득 찼습니다.");
+      const slot = room.players[uid].slot;
+      roomCodeRef.current = code;
+      hostUidRef.current = room.hostId ?? "";
+      localSlotRef.current = slot;
+      isHostRef.current = false;
+      setRoomCode(code);
+      setHostUid(room.hostId ?? "");
+      setLocalSlot(slot);
+      setRoomBoardSize(room.boardSize ?? 7);
+      subscribeToRoom(database, code, uid);
+      await onDisconnect(ref(database, `rooms/${code}/players/${uid}`)).remove();
+      setStatus("connecting");
+    } catch (reason) {
+      setStatus("error");
+      setError(reason instanceof Error ? reason.message : "방에 참가하지 못했습니다.");
+    }
+  }, [getServices, leave, subscribeToRoom]);
+
+  const sendToHost = useCallback((message: OnlineGameMessage) => {
+    const uid = localUidRef.current;
+    if (isHostRef.current) {
+      onMessageRef.current(message, uid);
+      return true;
+    }
+    const channel = dataChannels.current.get(hostUidRef.current);
+    if (!channel || channel.readyState !== "open") {
+      setError("호스트와 직접 연결되어 있지 않습니다.");
+      return false;
+    }
+    channel.send(JSON.stringify(message));
+    return true;
+  }, []);
+
+  const broadcast = useCallback(async (message: OnlineGameMessage) => {
+    if (!isHostRef.current) return false;
+    const payload = JSON.stringify(message);
+    dataChannels.current.forEach((channel) => {
+      if (channel.readyState === "open") channel.send(payload);
+    });
+    onMessageRef.current(message, localUidRef.current);
+    if (message.kind === "start") {
+      const database = databaseRef.current;
+      if (database && roomCodeRef.current) {
+        await set(ref(database, `rooms/${roomCodeRef.current}/status`), "playing");
+      }
+      setStatus("playing");
+    }
+    return true;
+  }, []);
+
+  useEffect(() => () => {
+    unsubscribes.current.forEach((unsubscribe) => unsubscribe());
+    dataChannels.current.forEach((channel) => channel.close());
+    peerConnections.current.forEach((connection) => connection.close());
+  }, []);
+
+  return {
+    configured: Boolean(config) && typeof RTCPeerConnection !== "undefined",
+    status,
+    error,
+    roomCode,
+    roomBoardSize,
+    players,
+    localUid,
+    localSlot,
+    isHost: Boolean(localUid && localUid === hostUid),
+    allConnected: players.length === MAX_PLAYERS && players.every((player) => player.connected),
+    createRoom,
+    joinRoom,
+    leave,
+    sendToHost,
+    broadcast,
+  };
+}

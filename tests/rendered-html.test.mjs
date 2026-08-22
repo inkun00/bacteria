@@ -91,7 +91,7 @@ test("ships the 10-stage curriculum campaign, boss mechanics, and cinematic asse
   const stageIds = [...story.matchAll(/^\s{4}id: (\d+),$/gm)].map((match) => Number(match[1]));
   assert.deepEqual(stageIds, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   for (let lesson = 2; lesson <= 10; lesson += 1) {
-    assert.match(story, new RegExp(`id: ${lesson - 1},\\n    lesson: "${lesson}차시`));
+    assert.match(story, new RegExp(`id: ${lesson - 1},\\r?\\n    lesson: "${lesson}차시`));
   }
   assert.match(story, /id: 10/);
   assert.doesNotMatch(story, /1차시 · 단원 도입/);

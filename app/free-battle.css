@@ -304,7 +304,7 @@
 .free-battle .footer-line p { margin: 0; text-align: center; color: #698b80; letter-spacing: 0; }
 
 .free-battle .modal-backdrop, .free-battle .drawer-backdrop, .free-battle .result-layer { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgba(1, 8, 7, .78); backdrop-filter: blur(18px); }
-.free-battle .setup-modal { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: clamp(20px, 4vw, 38px); border: 1px solid rgba(143, 222, 195, .22); border-radius: 20px; background: linear-gradient(145deg, rgba(15, 48, 40, .98), rgba(4, 18, 15, .99)); box-shadow: 0 35px 100px rgba(0,0,0,.6), inset 0 1px rgba(255,255,255,.05); }
+.free-battle .setup-modal { width: min(760px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: clamp(20px, 4vw, 38px); border: 1px solid rgba(143, 222, 195, .22); border-radius: 20px; background: linear-gradient(145deg, rgba(15, 48, 40, .98), rgba(4, 18, 15, .99)); box-shadow: 0 35px 100px rgba(0,0,0,.6), inset 0 1px rgba(255,255,255,.05); }
 .free-battle .modal-kicker { display: flex; align-items: center; justify-content: center; gap: 12px; color: #62887b; font: 700 8px var(--font-geist-mono), monospace; letter-spacing: .18em; }
 .free-battle .modal-kicker span { width: 34px; height: 1px; background: #335b4f; }
 .free-battle .setup-hero { display: grid; grid-template-columns: 1fr 1.4fr 1fr; align-items: center; margin: 0 0 20px; }
@@ -316,7 +316,7 @@
 .free-battle .versus h1 { margin: 0 0 2px; font-size: clamp(25px, 5vw, 44px); letter-spacing: -.06em; line-height: 1; white-space: nowrap; }
 .free-battle .versus p { margin: 7px 0 0; color: #8ba99f; font-size: 11px; }
 
-.free-battle .mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.free-battle .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .free-battle .mode-tabs button { display: flex; align-items: center; gap: 12px; min-height: 67px; padding: 12px 14px; text-align: left; border: 1px solid var(--line); border-radius: 10px; color: #a8c3ba; background: rgba(120, 184, 162, .035); cursor: pointer; transition: .2s; }
 .free-battle .mode-tabs button:hover { background: rgba(120,184,162,.08); }
 .free-battle .mode-tabs button.selected { border-color: rgba(53,234,211,.48); color: white; background: rgba(53,234,211,.075); box-shadow: inset 0 0 18px rgba(53,234,211,.035); }
@@ -354,6 +354,38 @@
 .free-battle .launch-button { width: 100%; height: 52px; display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 18px; border: 0; border-radius: 10px; color: #05120f; background: linear-gradient(100deg, #35ddc7, #a8ef92); font-weight: 800; font-size: 13px; letter-spacing: .08em; cursor: pointer; box-shadow: 0 10px 28px rgba(53,234,211,.16); transition: transform .2s, filter .2s; }
 .free-battle .launch-button:hover { transform: translateY(-2px); filter: brightness(1.08); }
 .free-battle .launch-button i { font-style: normal; font-size: 19px; }
+.free-battle .online-lobby { margin-top: 18px; padding: 16px; border: 1px solid rgba(53,234,211,.22); border-radius: 12px; background: rgba(2,17,14,.5); }
+.free-battle .online-lobby label { display: grid; gap: 7px; }
+.free-battle .online-lobby label span { color: #89a99e; font-size: 9px; font-weight: 700; }
+.free-battle .online-lobby input { min-width: 0; height: 43px; padding: 0 12px; border: 1px solid rgba(116,177,157,.3); border-radius: 8px; outline: 0; color: #effff9; background: rgba(3,20,16,.8); font: 700 12px var(--font-geist-mono), monospace; text-transform: uppercase; }
+.free-battle .online-lobby input:focus { border-color: rgba(53,234,211,.7); box-shadow: 0 0 0 3px rgba(53,234,211,.08); }
+.free-battle .online-entry-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 9px; margin-top: 12px; }
+.free-battle .online-entry-actions > button, .free-battle .online-entry-actions > div { min-height: 58px; border: 1px solid rgba(53,234,211,.3); border-radius: 9px; background: rgba(53,234,211,.06); }
+.free-battle .online-entry-actions > button { display: grid; align-content: center; gap: 3px; color: #dffff8; cursor: pointer; }
+.free-battle .online-entry-actions > button small { color: #668d80; font-size: 8px; }
+.free-battle .online-entry-actions > div { display: grid; grid-template-columns: 1fr 74px; padding: 7px; }
+.free-battle .online-entry-actions > div input { height: 42px; border-radius: 6px 0 0 6px; letter-spacing: .13em; }
+.free-battle .online-entry-actions > div button { border: 0; border-radius: 0 6px 6px 0; color: #05221c; background: var(--cyan); font-weight: 900; cursor: pointer; }
+.free-battle .online-entry-actions button:disabled, .free-battle .online-start:disabled { opacity: .38; cursor: not-allowed; }
+.free-battle .room-code-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 9px; background: rgba(53,234,211,.07); }
+.free-battle .room-code-card span { color: #789a8f; font-size: 9px; }
+.free-battle .room-code-card strong { color: var(--cyan); font: 900 24px var(--font-geist-mono), monospace; letter-spacing: .18em; }
+.free-battle .room-code-card button { height: 32px; padding: 0 12px; border: 1px solid rgba(53,234,211,.3); border-radius: 6px; color: var(--cyan); background: transparent; cursor: pointer; }
+.free-battle .online-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 10px; }
+.free-battle .online-slots > div { min-width: 0; padding: 10px; border: 1px solid rgba(112,158,143,.18); border-radius: 8px; background: rgba(100,160,140,.025); }
+.free-battle .online-slots > div.blue.connected { border-color: rgba(53,234,211,.48); background: rgba(53,234,211,.06); }
+.free-battle .online-slots > div.red.connected { border-color: rgba(255,109,104,.48); background: rgba(255,109,104,.06); }
+.free-battle .online-slots span, .free-battle .online-slots b, .free-battle .online-slots small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.free-battle .online-slots span { color: #5d8175; font-size: 7px; }
+.free-battle .online-slots b { margin-top: 5px; color: #d9eee7; font-size: 10px; }
+.free-battle .online-slots small { margin-top: 4px; color: #668a7f; font-size: 7px; }
+.free-battle .direct-only-note { margin: 10px 0; color: #788e87; font-size: 8px; line-height: 1.5; text-align: center; }
+.free-battle .online-start { width: 100%; height: 45px; border: 0; border-radius: 8px; color: #05211b; background: linear-gradient(100deg, #35ddc7, #a8ef92); font-weight: 900; cursor: pointer; }
+.free-battle .online-waiting { padding: 13px; border-radius: 8px; color: #95b2a8; background: rgba(112,158,143,.06); text-align: center; font-size: 9px; }
+.free-battle .online-leave { display: block; margin: 10px auto 0; border: 0; color: #78958b; background: transparent; font-size: 9px; cursor: pointer; }
+.free-battle .online-error, .free-battle .online-warning p { margin: 10px 0 0; color: #ffaaa5; font-size: 9px; line-height: 1.5; text-align: center; }
+.free-battle .online-warning { padding: 17px; border: 1px solid rgba(255,180,75,.3); border-radius: 9px; text-align: center; background: rgba(120,70,20,.12); }
+.free-battle .online-warning b { color: #ffd58d; font-size: 11px; }
 .free-battle .rules-link { display: block; margin: 12px auto 0; padding: 0; border: 0; color: #66877d; background: none; font-size: 9px; cursor: pointer; }
 .free-battle .rules-link span { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 4px; border: 1px solid #46695e; border-radius: 50%; }
 
@@ -507,6 +539,10 @@
   .free-battle .setup-hero { grid-template-columns: .7fr 1.4fr .7fr; }
   .free-battle .hero-germ { width: 82px; }
   .free-battle .mode-tabs { grid-template-columns: 1fr; }
+  .free-battle .online-entry-actions { grid-template-columns: 1fr; }
+  .free-battle .online-slots { grid-template-columns: 1fr 1fr; }
+  .free-battle .room-code-card { grid-template-columns: auto 1fr; }
+  .free-battle .room-code-card button { grid-column: 1 / -1; }
   .free-battle .difficulty-grid { gap: 5px; }
   .free-battle .difficulty-grid button { padding: 9px 7px; }
   .free-battle .difficulty-grid button > span { align-items: center; }

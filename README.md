@@ -16,6 +16,23 @@ npm run dev
 npm run build
 ```
 
+## Firebase + WebRTC 온라인 2:2 설정
+
+온라인 대전은 Firebase Realtime Database를 방 찾기와 WebRTC 시그널링에만 사용합니다. 실제 게임 데이터는 TURN 없이 플레이어와 방장 사이의 WebRTC DataChannel로 직접 전달됩니다.
+
+1. Firebase 콘솔에서 웹 앱과 Realtime Database를 만듭니다.
+2. Authentication의 로그인 제공업체에서 `익명` 로그인을 활성화합니다.
+3. `.env.example`의 `NEXT_PUBLIC_FIREBASE_*` 항목을 `.env.local`에 복사하고 웹 앱 구성 값을 입력합니다.
+4. Firebase CLI로 데이터베이스 규칙을 배포합니다.
+
+```bash
+npx firebase-tools login
+npx firebase-tools use <project-id>
+npx firebase-tools deploy --only database
+```
+
+TURN을 사용하지 않기 때문에 대칭형 NAT, 일부 이동통신망, 회사나 학교 방화벽 환경에서는 직접 연결에 실패할 수 있습니다. 이 경우 게임은 비용이 발생하는 중계 연결로 우회하지 않고 사용자에게 네트워크 변경 안내를 표시합니다.
+
 This starter does not use `wrangler.jsonc`.
 
 ## Included Shape
