@@ -287,3 +287,31 @@ test("ships an interactive divisor, multiple, and split tutorial", async () => {
   assert.match(tutorialStyles, /@media \(max-width: 720px\)/);
   assert.match(tutorialStyles, /prefers-reduced-motion/);
 });
+
+test("ships the PDF certificate and review worksheet generation feature", async () => {
+  const [page, pdfReport, generator, styles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/pdf-report.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/worksheet-generator.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /PdfDownloadButton/);
+  assert.match(page, /STORY_INCORRECT_TASKS_KEY/);
+  assert.match(page, /CertificateDownloadModal/);
+  assert.match(page, /certificate-launch/);
+  assert.match(pdfReport, /exportWorksheetToPdf/);
+  assert.match(pdfReport, /수 료 및 임 명 인 증 서/);
+  assert.doesNotMatch(pdfReport, /FACTOR FORCE 약수와 배수/);
+  assert.doesNotMatch(pdfReport, /스토리 작전 중/);
+  assert.doesNotMatch(pdfReport, /오답 다시 풀기/);
+  assert.doesNotMatch(pdfReport, /쌍둥이 실전 문제/);
+  assert.match(pdfReport, /정답 \(Answer Key\)/);
+  assert.match(generator, /generateSimilarTask/);
+  assert.match(generator, /buildWorksheetReport/);
+  assert.match(styles, /\.ff-certificate-page/);
+  assert.match(styles, /\.ff-worksheet-page/);
+  assert.match(styles, /\.ws-footer-answers/);
+  assert.match(styles, /\.certificate-launch/);
+});
+

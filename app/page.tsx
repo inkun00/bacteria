@@ -13,6 +13,8 @@ import { assetUrl } from "./assets";
 import { GameExitPrompt, usePreventGameUnload } from "./game-navigation";
 import { factorPairs, getDistance, legalMoves, type Move, type RelationMode } from "./game";
 import { HALL_TIERS, getHallTier, hallTierRange, normalizeHallAttempts, type HallOfFameRecord } from "./hall-of-fame";
+import { PdfDownloadButton } from "./pdf-report";
+import { buildWorksheetReport, type IncorrectTaskRecord, type WorksheetReport } from "./worksheet-generator";
 import {
   MODE_COPY,
   STAGE_LEARNING_TASKS,
@@ -33,6 +35,8 @@ const STORY_SAVE_KEY = "factor-force-story-progress-v2";
 const LEGACY_STORY_SAVE_KEY = "factor-force-story-progress-v1";
 const STORY_ATTEMPTS_KEY = "factor-force-story-attempts-v1";
 const STORY_BATTLE_SAVE_KEY = "factor-force-active-battle-v1";
+const STORY_INCORRECT_TASKS_KEY = "factor-force-incorrect-tasks-v1";
+const STORY_CLEARED_KEY = "factor-force-story-cleared-v1";
 const STORY_STAGE_COUNT = STORY_STAGES.length;
 const BOSS_STAGE_ID = STORY_STAGES[STORY_STAGE_COUNT - 1].id;
 const MUSIC_TRACKS = {
@@ -165,6 +169,18 @@ function loadProgress() {
   }
 }
 
+function loadIncorrectTasks(): IncorrectTaskRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORY_INCORRECT_TASKS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as IncorrectTaskRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function stageModeLabel(modes: RelationMode[]) {
   return modes.map((mode) => MODE_COPY[mode].label.replace(" 모드", "")).join(" · ");
 }
@@ -227,12 +243,16 @@ function TitleScreen({
   onFree,
   onTutorial,
   onHallOfFame,
+  onCertificate,
+  storyCleared,
   tutorialCompleted,
 }: {
   onStory: () => void;
   onFree: () => void;
   onTutorial: () => void;
   onHallOfFame: () => void;
+  onCertificate: () => void;
+  storyCleared: boolean;
   tutorialCompleted: boolean;
 }) {
   return (
@@ -272,6 +292,11 @@ function TitleScreen({
           <button className="hall-launch" onClick={onHallOfFame}>
             <span><small>WORLD DEFENSE HONORS</small><b>명예의 전당</b><em>Padlet에 기록된 세계 방어대 상위 50인을 확인하세요</em></span><i>★</i>
           </button>
+          {storyCleared && (
+            <button className="certificate-launch" onClick={onCertificate}>
+              <span><small>EARTH DEFENSE HONORS</small><b>수료 인증서 & 오답 학습지</b><em>클리어 인증서와 맞춤형 오답 학습지를 PDF로 다운로드하세요</em></span><i>📜</i>
+            </button>
+          )}
         </div>
         <footer><span>FACTOR FORCE</span><i /> <span>버전 07.26</span></footer>
       </section>
@@ -530,6 +555,8 @@ function HallOfFame({
   comment,
   status,
   error,
+  rankText,
+  worksheetReport,
   onNameChange,
   onCommentChange,
   onSubmit,
@@ -540,6 +567,8 @@ function HallOfFame({
   comment: string;
   status: HallOfFameStatus;
   error: string;
+  rankText: string;
+  worksheetReport: WorksheetReport;
   onNameChange: (value: string) => void;
   onCommentChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -557,7 +586,10 @@ function HallOfFame({
         <div className="hall-of-fame-record">
           <span>전체 클리어 기록<br /><small>{hallTierRange(tier)} 등급</small></span>
           <strong>{attempts}<small>회</small></strong>
+          <span className="hall-rank-pill"><small>순위</small><b>{rankText}</b></span>
         </div>
+
+        <PdfDownloadButton report={worksheetReport} />
 
         {submitted ? (
           <div className="hall-of-fame-success" role="status">
@@ -603,6 +635,58 @@ function HallOfFame({
 
         <button className="hall-of-fame-finish" type="button" onClick={onFinish}>
           {submitted ? "처음 화면으로" : "기록하지 않고 끝내기"}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function CertificateDownloadModal({
+  name,
+  attempts,
+  rankText,
+  worksheetReport,
+  onNameChange,
+  onClose,
+}: {
+  name: string;
+  attempts: number;
+  rankText: string;
+  worksheetReport: WorksheetReport;
+  onNameChange: (value: string) => void;
+  onClose: () => void;
+}) {
+  const tier = getHallTier(attempts);
+  return (
+    <div className="hall-of-fame" role="dialog" aria-modal="true" aria-labelledby="cert-center-title">
+      <section className="hall-of-fame-card cert-center-card">
+        <img className="hall-of-fame-badge" src={assetUrl(tier.badge)} alt={`${tier.title} 뱃지`} />
+        <small>EARTH DEFENSE CERTIFICATION CENTER<br />LEVEL {tier.level}</small>
+        <h2 id="cert-center-title">{tier.title}</h2>
+        <p>{tier.description} 칭호를 수여받은 지구 방어대원의 공식 수료 인증서 및 맞춤형 오답 학습지입니다.</p>
+
+        <div className="hall-of-fame-record">
+          <span>전체 클리어 기록<br /><small>{hallTierRange(tier)} 등급</small></span>
+          <strong>{attempts}<small>회</small></strong>
+          <span className="hall-rank-pill"><small>순위</small><b>{rankText}</b></span>
+        </div>
+
+        <div className="cert-center-input-box">
+          <label htmlFor="cert-modal-name">대원 성명 (인증서 및 학습지 표기용)</label>
+          <input
+            id="cert-modal-name"
+            type="text"
+            value={name}
+            maxLength={30}
+            onChange={(event) => onNameChange(event.target.value)}
+            placeholder="인증서에 표기할 대원 이름"
+          />
+        </div>
+
+        <PdfDownloadButton report={worksheetReport} />
+
+        <button className="hall-of-fame-finish" type="button" onClick={onClose}>
+          닫기
         </button>
       </section>
     </div>
@@ -863,6 +947,10 @@ export default function Home() {
   const [learningGate, setLearningGate] = useState<LearningGateState | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [storyAttempts, setStoryAttempts] = useState(0);
+  const [storyCleared, setStoryCleared] = useState(false);
+  const [certificateModalOpen, setCertificateModalOpen] = useState(false);
+  const [incorrectTasks, setIncorrectTasks] = useState<IncorrectTaskRecord[]>([]);
+  const [calculatedRank, setCalculatedRank] = useState<string>("제 1위");
   const [hallOfFameOpen, setHallOfFameOpen] = useState(false);
   const [hallOfFameName, setHallOfFameName] = useState("");
   const [hallOfFameComment, setHallOfFameComment] = useState("");
@@ -889,8 +977,11 @@ export default function Home() {
       const savedAttempts = Number(window.localStorage.getItem(STORY_ATTEMPTS_KEY) ?? 0);
       const trackedAttempts = Number.isInteger(savedAttempts) && savedAttempts > 0 ? savedAttempts : 0;
       const restoredAttempts = Math.max(trackedAttempts, progress.length);
+      const isCleared = progress.length >= STORY_STAGE_COUNT || progress.includes(BOSS_STAGE_ID) || window.localStorage.getItem(STORY_CLEARED_KEY) === "true";
       setCompleted(progress);
       setStoryAttempts(restoredAttempts);
+      setIncorrectTasks(loadIncorrectTasks());
+      setStoryCleared(isCleared);
       if (restoredAttempts !== trackedAttempts) {
         window.localStorage.setItem(STORY_ATTEMPTS_KEY, String(restoredAttempts));
       }
@@ -1134,6 +1225,8 @@ export default function Home() {
     setBusy(false);
     setTurn(1);
     if (stage.id === BOSS_STAGE_ID && !freeBattle) {
+      window.localStorage.setItem(STORY_CLEARED_KEY, "true");
+      setStoryCleared(true);
       schedule(() => setCinematic("ending"), 850);
     } else {
       setResult("clear");
@@ -1324,7 +1417,29 @@ export default function Home() {
       if (!current) return current;
       const task = (STAGE_LEARNING_TASKS[battleStage.id] ?? [])[current.taskIndex];
       if (!task) return current;
-      return { ...current, status: isLearningAnswerCorrect(task, current.selected) ? "correct" : "wrong" };
+      const isCorrect = isLearningAnswerCorrect(task, current.selected);
+      if (!isCorrect) {
+        setIncorrectTasks((previous) => {
+          if (previous.some((item) => item.taskId === task.id)) return previous;
+          const next = [
+            ...previous,
+            {
+              stageId: battleStage.id,
+              taskId: task.id,
+              task,
+              wrongAnswers: [...current.selected],
+              timestamp: Date.now(),
+            },
+          ];
+          try {
+            window.localStorage.setItem(STORY_INCORRECT_TASKS_KEY, JSON.stringify(next));
+          } catch {
+            // ignore localStorage quota error
+          }
+          return next;
+        });
+      }
+      return { ...current, status: isCorrect ? "correct" : "wrong" };
     });
   }, [battleStage.id]);
 
@@ -1394,6 +1509,11 @@ export default function Home() {
     window.localStorage.removeItem(LEGACY_STORY_SAVE_KEY);
     window.localStorage.removeItem(STORY_ATTEMPTS_KEY);
     window.localStorage.removeItem(STORY_BATTLE_SAVE_KEY);
+    window.localStorage.removeItem(STORY_INCORRECT_TASKS_KEY);
+    window.localStorage.removeItem(STORY_CLEARED_KEY);
+    setIncorrectTasks([]);
+    setStoryCleared(false);
+    setCertificateModalOpen(false);
     setCinematic(null);
     setResult(null);
     setLearningGate(null);
@@ -1444,6 +1564,45 @@ export default function Home() {
     }
   }, [hallOfFameComment, hallOfFameName, storyAttempts]);
 
+  useEffect(() => {
+    if (!hallOfFameOpen && !certificateModalOpen) return;
+    let active = true;
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    const normalizedAttempts = normalizeHallAttempts(storyAttempts);
+    fetch(`${basePath}/api/hall-of-fame`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        const records = data?.records as HallOfFameRecord[] | undefined;
+        if (records && records.length > 0) {
+          const betterCount = records.filter((r) => r.attempts < normalizedAttempts).length;
+          setCalculatedRank(`제 ${betterCount + 1}위`);
+        } else {
+          setCalculatedRank("제 1위 (최초 기록)");
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setCalculatedRank(`상위 ${getHallTier(normalizedAttempts).level}단계`);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [certificateModalOpen, hallOfFameOpen, storyAttempts]);
+
+  const worksheetReport = useMemo(() => {
+    const attempts = normalizeHallAttempts(storyAttempts);
+    const tier = getHallTier(attempts);
+    return buildWorksheetReport({
+      studentName: hallOfFameName.trim() || "지구 방어대원",
+      tier,
+      attempts,
+      rankText: calculatedRank,
+      incorrectRecords: incorrectTasks,
+    });
+  }, [calculatedRank, hallOfFameName, incorrectTasks, storyAttempts]);
+
   const handleCinematicFinish = useCallback(() => {
     if (cinematic === "opening") {
       setCinematic(null);
@@ -1484,7 +1643,30 @@ export default function Home() {
   );
 
   if (view === "title") {
-    return <><TitleScreen onStory={() => setView("map")} onFree={() => setView("free")} onTutorial={() => setView("tutorial")} onHallOfFame={() => setView("hall")} tutorialCompleted={tutorialCompleted} /><AudioToggle enabled={soundEnabled} onToggle={toggleSound} /></>;
+    return (
+      <>
+        <TitleScreen
+          onStory={() => setView("map")}
+          onFree={() => setView("free")}
+          onTutorial={() => setView("tutorial")}
+          onHallOfFame={() => setView("hall")}
+          onCertificate={() => setCertificateModalOpen(true)}
+          storyCleared={storyCleared}
+          tutorialCompleted={tutorialCompleted}
+        />
+        {certificateModalOpen && (
+          <CertificateDownloadModal
+            name={hallOfFameName}
+            attempts={normalizeHallAttempts(storyAttempts)}
+            rankText={calculatedRank}
+            worksheetReport={worksheetReport}
+            onNameChange={setHallOfFameName}
+            onClose={() => setCertificateModalOpen(false)}
+          />
+        )}
+        <AudioToggle enabled={soundEnabled} onToggle={toggleSound} />
+      </>
+    );
   }
 
   if (view === "free") {
@@ -1513,6 +1695,11 @@ export default function Home() {
         <nav className="desktop-mode-nav" aria-label="게임 모드">
           <button className={view === "map" && !freeBattle ? "active" : ""} onClick={() => { setView("map"); setFreeBattle(false); }}>스토리 작전</button>
           <button onClick={() => setView("free")}>자유 대전</button>
+          {storyCleared && (
+            <button className="cert-nav-btn" onClick={() => setCertificateModalOpen(true)}>
+              📜 수료증/학습지
+            </button>
+          )}
         </nav>
         <div className="global-progress">
           <div><span>지구를 구한 정도</span><b>{Math.round((completed.length / STORY_STAGE_COUNT) * 100)}%</b></div>
@@ -1535,6 +1722,15 @@ export default function Home() {
               <div><b>{STORY_STAGE_COUNT - completed.length}</b><span>남은 작전</span></div>
               <div><b>{completed.includes(BOSS_STAGE_ID) ? "안정" : "위험"}</b><span>지구 상태</span></div>
             </div>
+            {storyCleared && (
+              <button
+                className="mission-cert-launch-btn"
+                type="button"
+                onClick={() => setCertificateModalOpen(true)}
+              >
+                📜 수료 인증서 & 오답 학습지 다운로드
+              </button>
+            )}
             <div className="transmission-log">
               <span className="pulse-dot" />
               <div><small>연구소 소식</small><p>{completed.length === 0 ? "치료 세균을 모두 만들었어요. 마닐라의 첫 작전을 시작할 수 있습니다." : completed.includes(BOSS_STAGE_ID) ? "전 세계의 감염 신호가 사라졌어요. 지구의 자연이 원래 모습을 되찾았습니다." : `${unlocked}번 감염 지역에서 도와 달라는 연락이 왔습니다.`}</p></div>
@@ -1679,10 +1875,22 @@ export default function Home() {
           comment={hallOfFameComment}
           status={hallOfFameStatus}
           error={hallOfFameError}
+          rankText={calculatedRank}
+          worksheetReport={worksheetReport}
           onNameChange={setHallOfFameName}
           onCommentChange={setHallOfFameComment}
           onSubmit={submitHallOfFame}
           onFinish={resetCompletedStory}
+        />
+      )}
+      {certificateModalOpen && (
+        <CertificateDownloadModal
+          name={hallOfFameName}
+          attempts={normalizeHallAttempts(storyAttempts)}
+          rankText={calculatedRank}
+          worksheetReport={worksheetReport}
+          onNameChange={setHallOfFameName}
+          onClose={() => setCertificateModalOpen(false)}
         />
       )}
     </main>
