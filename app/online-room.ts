@@ -71,6 +71,7 @@ type RoomRecord = {
   matchSize?: OnlineMatchSize;
   status?: "waiting" | "playing";
   players?: Record<string, Omit<OnlinePlayer, "uid" | "connected"> & { joinedAt?: number }>;
+  slotOwners?: Record<string, string>;
 };
 
 type SignalRecord = {
@@ -342,9 +343,13 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     const database = databaseRef.current;
     const code = roomCodeRef.current;
     const uid = localUidRef.current;
+    const slot = localSlotRef.current;
     if (database && code && uid) {
       if (isHostRef.current) await remove(ref(database, `rooms/${code}`)).catch(() => undefined);
-      else await remove(ref(database, `rooms/${code}/players/${uid}`)).catch(() => undefined);
+      else await Promise.all([
+        remove(ref(database, `rooms/${code}/players/${uid}`)).catch(() => undefined),
+        slot === null ? Promise.resolve() : remove(ref(database, `rooms/${code}/slotOwners/slot${slot}`)).catch(() => undefined),
+      ]);
     }
     roomCodeRef.current = "";
     hostUidRef.current = "";
@@ -375,6 +380,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
           status: "waiting",
           createdAt: serverTimestamp(),
           players: { [uid]: { name: cleanName(name), slot: 0, joinedAt: serverTimestamp() } },
+          slotOwners: { slot0: uid },
         } : undefined, { applyLocally: false });
         if (result.committed) {
           code = candidate;
@@ -404,6 +410,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     await leave();
     setStatus("joining");
     setError(null);
+    let reservation: { database: Database; code: string; uid: string; slot: number } | null = null;
     try {
       const code = cleanCode(rawCode);
       if (code.length !== ROOM_CODE_LENGTH) throw new Error("6자리 방 코드를 입력해주세요.");
@@ -411,26 +418,27 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       const roomReference = ref(database, `rooms/${code}`);
       const initialRoom = (await get(roomReference)).val() as RoomRecord | null;
       if (!initialRoom || initialRoom.status !== "waiting") throw new Error("방을 찾을 수 없거나 이미 게임 중입니다.");
-      const result = await runTransaction(roomReference, (current: RoomRecord | null) => {
-        if (!current || current.status !== "waiting") return;
-        const currentPlayers = current.players ?? {};
-        const roomMatchSize = current.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
-        if (currentPlayers[uid]) return current;
-        const usedSlots = new Set(Object.values(currentPlayers).map((player) => player.slot));
-        const slot = Array.from({ length: roomMatchSize - 1 }, (_, index) => index + 1)
-          .find((candidate) => !usedSlots.has(candidate));
-        if (slot === undefined) return;
-        return {
-          ...current,
-          players: {
-            ...currentPlayers,
-            [uid]: { name: cleanName(name), slot, joinedAt: serverTimestamp() },
-          },
-        };
-      }, { applyLocally: false });
-      const room = result.snapshot.val() as RoomRecord | null;
-      if (!result.committed || !room?.players?.[uid]) throw new Error("방을 찾을 수 없거나 이미 가득 찼습니다.");
-      const slot = room.players[uid].slot;
+      const roomMatchSize = initialRoom.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
+      let slot: number | undefined;
+      for (let candidate = 1; candidate < roomMatchSize; candidate += 1) {
+        const slotResult = await runTransaction(
+          ref(database, `rooms/${code}/slotOwners/slot${candidate}`),
+          (current) => current === null ? uid : undefined,
+          { applyLocally: false },
+        );
+        if (slotResult.committed && slotResult.snapshot.val() === uid) {
+          slot = candidate;
+          break;
+        }
+      }
+      if (slot === undefined) throw new Error("방을 찾을 수 없거나 이미 가득 찼습니다.");
+      reservation = { database, code, uid, slot };
+      const playerReference = ref(database, `rooms/${code}/players/${uid}`);
+      const slotReference = ref(database, `rooms/${code}/slotOwners/slot${slot}`);
+      await set(playerReference, { name: cleanName(name), slot, joinedAt: serverTimestamp() });
+      const room = (await get(roomReference)).val() as RoomRecord | null;
+      if (!room?.players?.[uid]) throw new Error("방 참가 정보를 확인하지 못했습니다.");
+      await Promise.all([onDisconnect(playerReference).remove(), onDisconnect(slotReference).remove()]);
       roomCodeRef.current = code;
       hostUidRef.current = room.hostId ?? "";
       localSlotRef.current = slot;
@@ -441,9 +449,15 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       setRoomBoardSize(room.boardSize ?? 7);
       setMatchSize(room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE);
       subscribeToRoom(database, code, uid);
-      await onDisconnect(ref(database, `rooms/${code}/players/${uid}`)).remove();
+      reservation = null;
       setStatus("connecting");
     } catch (reason) {
+      if (reservation) {
+        await Promise.all([
+          remove(ref(reservation.database, `rooms/${reservation.code}/players/${reservation.uid}`)).catch(() => undefined),
+          remove(ref(reservation.database, `rooms/${reservation.code}/slotOwners/slot${reservation.slot}`)).catch(() => undefined),
+        ]);
+      }
       setStatus("error");
       setError(reason instanceof Error ? reason.message : "방에 참가하지 못했습니다.");
     }
