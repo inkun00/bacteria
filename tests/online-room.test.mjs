@@ -13,6 +13,7 @@ test("online 2v2 uses Firebase signaling and STUN-only WebRTC", async () => {
   assert.match(source, /initialRoom = \(await get\(roomReference\)\)\.val\(\)/);
   assert.match(source, /slotOwners\/slot\$\{candidate\}/);
   assert.match(source, /current === null \? uid : undefined/);
+  assert.match(source, /setPersistence\(auth, inMemoryPersistence\)/);
 });
 
 test("free battle exposes room creation, joining, and four connected slots", async () => {

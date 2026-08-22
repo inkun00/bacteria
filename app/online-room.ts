@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from "firebase/auth";
+import { getAuth, inMemoryPersistence, onAuthStateChanged, setPersistence, signInAnonymously, type Auth } from "firebase/auth";
 import {
   get,
   getDatabase,
@@ -284,6 +284,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     const app = appRef.current ?? (getApps().length ? getApp() : initializeApp(config));
     appRef.current = app;
     const auth = getAuth(app);
+    await setPersistence(auth, inMemoryPersistence);
     const database = getDatabase(app);
     databaseRef.current = database;
     const user = await waitForUser(auth);
