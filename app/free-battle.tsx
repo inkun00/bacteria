@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { assetUrl } from "./assets";
 import { GameExitPrompt, usePreventGameUnload } from "./game-navigation";
 import {
@@ -27,6 +27,7 @@ import {
   type Player,
   type RelationMode,
 } from "./game";
+import { ratingTier, useRankedAccount } from "./ranked-account";
 
 type Mode = "ai" | "local" | "online";
 type Settings = { mode: Mode; difficulty: Difficulty; boardSize: BoardSize };
@@ -179,6 +180,15 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [onlineJoinCode, setOnlineJoinCode] = useState("");
   const [onlineMatchSize, setOnlineMatchSize] = useState<OnlineMatchSize>(4);
   const [activeSlot, setActiveSlot] = useState(0);
+  const [onlineMatchId, setOnlineMatchId] = useState("");
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [rankingOpen, setRankingOpen] = useState(false);
+  const [accountMode, setAccountMode] = useState<"login" | "create">("login");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [accountFeedback, setAccountFeedback] = useState("");
+  const [ratingDelta, setRatingDelta] = useState<number | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
   const sequenceTimers = useRef<number[]>([]);
@@ -188,6 +198,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const online = useOnlineRoom(useCallback((message: OnlineGameMessage, senderUid: string) => {
     onlineMessageHandlerRef.current(message, senderUid);
   }, []));
+  const ranked = useRankedAccount();
+  const settledMatchRef = useRef("");
   const gameInProgress = hydrated && gameStarted && !gameOver;
 
   usePreventGameUnload(gameInProgress);
@@ -634,6 +646,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       if (message.kind === "start") {
         if (!online.isHost && senderUid !== hostUid) return;
         setActiveSlot(message.activeSlot);
+        setOnlineMatchId(message.matchId);
+        setRatingDelta(null);
         handledOnlineRequests.current.clear();
         startGame(
           { mode: "online", difficulty: "medium", boardSize: message.boardSize },
@@ -778,11 +792,21 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   };
 
   const createOnlineRoom = () => {
-    void online.createRoom(onlineName, draftSettings.boardSize, onlineMatchSize);
+    if (!ranked.user || !ranked.profile) {
+      setAccountOpen(true);
+      setAccountFeedback("랭크 방을 만들려면 먼저 로그인해주세요.");
+      return;
+    }
+    void online.createRoom(ranked.profile.displayName, draftSettings.boardSize, onlineMatchSize, ranked.profile.rating);
   };
 
   const joinOnlineRoom = () => {
-    void online.joinRoom(onlineJoinCode, onlineName);
+    if (!ranked.user || !ranked.profile) {
+      setAccountOpen(true);
+      setAccountFeedback("랭크 방에 참가하려면 먼저 로그인해주세요.");
+      return;
+    }
+    void online.joinRoom(onlineJoinCode, ranked.profile.displayName, ranked.profile.rating);
   };
 
   const startOnlineBattle = () => {
@@ -794,7 +818,36 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       numbers: createNumbers(freshBoard),
       boardSize: draftSettings.boardSize,
       activeSlot: 0,
+      matchId: crypto.randomUUID(),
     });
+  };
+
+  useEffect(() => {
+    if (settings.mode !== "online" || !gameOver || !onlineMatchId || !ranked.profile || online.localSlot === null) return;
+    if (settledMatchRef.current === onlineMatchId) return;
+    settledMatchRef.current = onlineMatchId;
+    const myTeam = teamForSlot(online.localSlot);
+    const opponents = online.players.filter((player) => teamForSlot(player.slot) !== myTeam);
+    const opponentRating = opponents.length
+      ? opponents.reduce((total, player) => total + player.rating, 0) / opponents.length
+      : ranked.profile.rating;
+    const outcome = winner === 0 ? "draw" : winner === myTeam ? "win" : "loss";
+    void ranked.recordResult(onlineMatchId, outcome, opponentRating)
+      .then((delta) => setRatingDelta(delta))
+      .catch(() => setRatingDelta(null));
+  }, [gameOver, online.localSlot, online.players, onlineMatchId, ranked, settings.mode, winner]);
+
+  const submitAccount = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAccountFeedback("");
+    try {
+      if (accountMode === "create") await ranked.createAccount(accountEmail, accountPassword, accountName);
+      else await ranked.login(accountEmail, accountPassword);
+      setAccountPassword("");
+      setAccountOpen(false);
+    } catch (reason) {
+      setAccountFeedback(reason instanceof Error ? reason.message : "계정 요청을 처리하지 못했습니다.");
+    }
   };
 
   const blueOnlineNames = online.players.filter((player) => teamForSlot(player.slot) === 1).map((player) => player.name).join(" · ");
@@ -1074,6 +1127,31 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
 
             {draftSettings.mode === "online" && (
               <section className="online-lobby" aria-label="온라인 대전방">
+                <div className="rank-account-card">
+                  {ranked.profile ? (
+                    <>
+                      <div className="rank-emblem" aria-hidden="true">{ratingTier(ranked.profile.rating).slice(0, 1)}</div>
+                      <div>
+                        <small>랭크 대전 계정</small>
+                        <b>{ranked.profile.displayName}</b>
+                        <span>{ratingTier(ranked.profile.rating)} · MMR {ranked.profile.rating} · {ranked.profile.wins}승 {ranked.profile.losses}패</span>
+                      </div>
+                      <button type="button" onClick={() => setRankingOpen(true)}>랭킹 보기</button>
+                      <button className="account-logout" type="button" onClick={() => void ranked.logout()}>로그아웃</button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="rank-emblem locked" aria-hidden="true">R</div>
+                      <div>
+                        <small>랭크 대전 계정</small>
+                        <b>{ranked.ready ? "로그인이 필요합니다" : "계정 확인 중"}</b>
+                        <span>계정을 만들면 MMR과 승패가 계속 기록됩니다.</span>
+                      </div>
+                      <button type="button" onClick={() => { setAccountMode("create"); setAccountOpen(true); }}>계정 만들기</button>
+                      <button type="button" onClick={() => { setAccountMode("login"); setAccountOpen(true); }}>로그인</button>
+                    </>
+                  )}
+                </div>
                 {!online.roomCode && (
                   <div className="match-size-select" role="group" aria-label="방을 만들 때 사용할 대전 인원">
                     <div><span>대전 방식</span><small>새 방을 만들 때 적용됩니다</small></div>
@@ -1094,10 +1172,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                   <>
                     <label>
                       <span>표시 이름</span>
-                      <input value={onlineName} maxLength={16} onChange={(event) => setOnlineName(event.target.value)} placeholder="연구원 이름" />
+                      <input value={ranked.profile?.displayName ?? onlineName} maxLength={16} readOnly={Boolean(ranked.profile)} onChange={(event) => setOnlineName(event.target.value)} placeholder="연구원 이름" />
                     </label>
                     <div className="online-entry-actions">
-                      <button onClick={createOnlineRoom} disabled={online.status === "joining"}>
+                      <button onClick={createOnlineRoom} disabled={online.status === "joining" || !ranked.profile}>
                         <b>새 방 만들기</b><small>내가 방장이 됩니다</small>
                       </button>
                       <div>
@@ -1108,7 +1186,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                           placeholder="방 코드 6자리"
                           aria-label="참가할 방 코드"
                         />
-                        <button onClick={joinOnlineRoom} disabled={online.status === "joining" || onlineJoinCode.length !== 6}>참가</button>
+                        <button onClick={joinOnlineRoom} disabled={online.status === "joining" || onlineJoinCode.length !== 6 || !ranked.profile}>참가</button>
                       </div>
                     </div>
                   </>
@@ -1175,6 +1253,49 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         </div>
       )}
 
+      {accountOpen && (
+        <div className="account-modal-backdrop">
+          <section className="account-modal" role="dialog" aria-modal="true" aria-labelledby="rank-account-title">
+            <button className="account-modal-close" type="button" onClick={() => setAccountOpen(false)} aria-label="계정 창 닫기">×</button>
+            <small>FACTOR FORCE // RANKED ACCOUNT</small>
+            <h2 id="rank-account-title">{accountMode === "create" ? "방어대 계정 만들기" : "방어대 계정 로그인"}</h2>
+            <p>온라인 경기의 MMR, 티어와 승패 기록을 이 계정에 저장합니다.</p>
+            <div className="account-tabs" role="tablist" aria-label="계정 메뉴">
+              <button className={accountMode === "login" ? "selected" : ""} type="button" onClick={() => { setAccountMode("login"); setAccountFeedback(""); }}>로그인</button>
+              <button className={accountMode === "create" ? "selected" : ""} type="button" onClick={() => { setAccountMode("create"); setAccountFeedback(""); }}>계정 만들기</button>
+            </div>
+            <form onSubmit={submitAccount}>
+              {accountMode === "create" && (
+                <label><span>표시 이름</span><input value={accountName} maxLength={16} autoComplete="nickname" onChange={(event) => setAccountName(event.target.value)} placeholder="게임에서 사용할 이름" required /></label>
+              )}
+              <label><span>이메일</span><input type="email" value={accountEmail} autoComplete="email" onChange={(event) => setAccountEmail(event.target.value)} placeholder="name@example.com" required /></label>
+              <label><span>비밀번호</span><input type="password" value={accountPassword} minLength={6} autoComplete={accountMode === "create" ? "new-password" : "current-password"} onChange={(event) => setAccountPassword(event.target.value)} placeholder="6자 이상" required /></label>
+              {(accountFeedback || ranked.error) && <div className="account-feedback" role="alert">{accountFeedback || ranked.error}</div>}
+              <button className="account-submit" type="submit" disabled={ranked.busy}>{ranked.busy ? "처리 중..." : accountMode === "create" ? "MMR 1000으로 시작하기" : "로그인"}</button>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {rankingOpen && (
+        <div className="account-modal-backdrop">
+          <section className="ranking-modal" role="dialog" aria-modal="true" aria-labelledby="ranking-title">
+            <button className="account-modal-close" type="button" onClick={() => setRankingOpen(false)} aria-label="랭킹 창 닫기">×</button>
+            <small>WORLD DEFENSE RANKING</small>
+            <h2 id="ranking-title">온라인 랭킹 TOP 50</h2>
+            <p>MMR이 높은 순서로 표시됩니다. 동점이면 승리 수와 경기 수를 비교합니다.</p>
+            <div className="ranking-table" role="table" aria-label="온라인 상위 랭킹">
+              <div className="ranking-row heading" role="row"><span>순위</span><span>연구원</span><span>티어</span><span>MMR</span><span>전적</span></div>
+              {ranked.leaderboard.length ? ranked.leaderboard.map((entry, index) => (
+                <div key={entry.uid} className={`ranking-row ${entry.uid === ranked.user?.uid ? "mine" : ""}`} role="row">
+                  <strong>{index + 1}</strong><b>{entry.displayName}</b><span>{ratingTier(entry.rating)}</span><em>{entry.rating}</em><small>{entry.wins}승 {entry.losses}패 {entry.draws}무</small>
+                </div>
+              )) : <div className="ranking-empty">아직 등록된 랭크 기록이 없습니다. 첫 승리의 주인공이 되어보세요.</div>}
+            </div>
+          </section>
+        </div>
+      )}
+
       {restartPromptOpen && !setupOpen && (
         <div className="modal-backdrop restart-backdrop">
           <section className="restart-modal" role="alertdialog" aria-modal="true" aria-labelledby="restart-title" aria-describedby="restart-description">
@@ -1206,6 +1327,13 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             <h2>{winner === 0 ? "무승부" : `${winner === 1 ? "파란" : "빨간"} 팀 승리`}</h2>
             <p>{scores[0]} <i>:</i> {scores[1]}</p>
             <small>{moveNumber - 1}번 움직임 · {formatTime(elapsed)}</small>
+            {settings.mode === "online" && ranked.profile && (
+              <div className={`rank-result ${ratingDelta !== null && ratingDelta < 0 ? "down" : "up"}`}>
+                <span>{ratingTier(ranked.profile.rating)}</span>
+                <b>MMR {ranked.profile.rating}</b>
+                <em>{ratingDelta === null ? "정산 중" : ratingDelta > 0 ? `+${ratingDelta}` : ratingDelta}</em>
+              </div>
+            )}
             <div>
               <button onClick={() => {
                 if (settings.mode !== "online") startGame(settings);

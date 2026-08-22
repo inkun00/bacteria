@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, inMemoryPersistence, onAuthStateChanged, setPersistence, signInAnonymously, type Auth } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously, type Auth } from "firebase/auth";
 import {
   get,
-  getDatabase,
   onChildAdded,
   onDisconnect,
   onValue,
@@ -17,12 +15,14 @@ import {
   type Unsubscribe,
 } from "firebase/database";
 import type { BoardSize, Cell, Move, NumberCell, Player, RelationMode } from "./game";
+import { firebaseConfig, getFirebaseClient } from "./firebase-client";
 
 export type OnlinePlayer = {
   uid: string;
   name: string;
   slot: number;
   connected: boolean;
+  rating: number;
 };
 
 export type OnlineMatchSize = 2 | 4;
@@ -45,6 +45,7 @@ export type OnlineGameMessage =
       numbers: NumberCell[];
       boardSize: BoardSize;
       activeSlot: number;
+      matchId: string;
     }
   | {
       kind: "move-request";
@@ -88,17 +89,6 @@ const DEFAULT_MATCH_SIZE: OnlineMatchSize = 4;
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
 ];
-
-function firebaseConfig() {
-  const config = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  };
-  return Object.values(config).every(Boolean) ? config as Record<keyof typeof config, string> : null;
-}
 
 function createRoomCode() {
   const random = new Uint32Array(ROOM_CODE_LENGTH);
@@ -147,7 +137,6 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const [localSlot, setLocalSlot] = useState<number | null>(null);
   const [roomBoardSize, setRoomBoardSize] = useState<BoardSize>(7);
   const [matchSize, setMatchSize] = useState<OnlineMatchSize>(DEFAULT_MATCH_SIZE);
-  const appRef = useRef<FirebaseApp | null>(null);
   const databaseRef = useRef<Database | null>(null);
   const roomCodeRef = useRef("");
   const localUidRef = useRef("");
@@ -281,11 +270,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
 
   const getServices = useCallback(async () => {
     if (!config) throw new Error("Firebase 환경 설정이 없습니다. .env.local을 설정해주세요.");
-    const app = appRef.current ?? (getApps().length ? getApp() : initializeApp(config));
-    appRef.current = app;
-    const auth = getAuth(app);
-    await setPersistence(auth, inMemoryPersistence);
-    const database = getDatabase(app);
+    const { auth, database } = await getFirebaseClient();
     databaseRef.current = database;
     const user = await waitForUser(auth);
     localUidRef.current = user.uid;
@@ -308,6 +293,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
           uid: playerUid,
           name: player.name,
           slot: player.slot,
+          rating: Number.isFinite(player.rating) ? Math.max(0, Math.round(player.rating)) : 1000,
           connected: playerUid === uid || dataChannels.current.get(playerUid)?.readyState === "open",
         }))
         .sort((left, right) => left.slot - right.slot);
@@ -365,7 +351,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     leavingRef.current = false;
   }, []);
 
-  const createRoom = useCallback(async (name: string, boardSize: BoardSize, requestedMatchSize: OnlineMatchSize) => {
+  const createRoom = useCallback(async (name: string, boardSize: BoardSize, requestedMatchSize: OnlineMatchSize, rating = 1000) => {
     await leave();
     setStatus("joining");
     setError(null);
@@ -380,7 +366,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
           matchSize: requestedMatchSize,
           status: "waiting",
           createdAt: serverTimestamp(),
-          players: { [uid]: { name: cleanName(name), slot: 0, joinedAt: serverTimestamp() } },
+          players: { [uid]: { name: cleanName(name), slot: 0, rating: Math.max(0, Math.round(rating)), joinedAt: serverTimestamp() } },
           slotOwners: { slot0: uid },
         } : undefined, { applyLocally: false });
         if (result.committed) {
@@ -407,7 +393,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     }
   }, [getServices, leave, subscribeToRoom]);
 
-  const joinRoom = useCallback(async (rawCode: string, name: string) => {
+  const joinRoom = useCallback(async (rawCode: string, name: string, rating = 1000) => {
     await leave();
     setStatus("joining");
     setError(null);
@@ -436,7 +422,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       reservation = { database, code, uid, slot };
       const playerReference = ref(database, `rooms/${code}/players/${uid}`);
       const slotReference = ref(database, `rooms/${code}/slotOwners/slot${slot}`);
-      await set(playerReference, { name: cleanName(name), slot, joinedAt: serverTimestamp() });
+      await set(playerReference, { name: cleanName(name), slot, rating: Math.max(0, Math.round(rating)), joinedAt: serverTimestamp() });
       const room = (await get(roomReference)).val() as RoomRecord | null;
       if (!room?.players?.[uid]) throw new Error("방 참가 정보를 확인하지 못했습니다.");
       await Promise.all([onDisconnect(playerReference).remove(), onDisconnect(slotReference).remove()]);

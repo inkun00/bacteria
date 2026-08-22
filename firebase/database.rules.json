@@ -9,7 +9,7 @@
         ".validate": "newData.hasChildren(['hostId', 'boardSize', 'matchSize', 'status', 'players']) && newData.child('hostId').isString() && (newData.child('boardSize').val() == 7 || newData.child('boardSize').val() == 9 || newData.child('boardSize').val() == 11) && (newData.child('matchSize').val() == 2 || newData.child('matchSize').val() == 4) && (newData.child('status').val() == 'waiting' || newData.child('status').val() == 'playing')",
         "players": {
           "$uid": {
-            ".validate": "newData.hasChildren(['name', 'slot']) && newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('slot').isNumber() && newData.child('slot').val() >= 0 && newData.child('slot').val() < newData.parent().parent().child('matchSize').val()"
+            ".validate": "newData.hasChildren(['name', 'slot', 'rating']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 16 && newData.child('slot').isNumber() && newData.child('slot').val() >= 0 && newData.child('slot').val() < newData.parent().parent().child('matchSize').val() && newData.child('rating').isNumber() && newData.child('rating').val() >= 0 && newData.child('rating').val() <= 10000"
           }
         },
         "slotOwners": {
@@ -24,6 +24,26 @@
             }
           }
         }
+      }
+    },
+    "rankedUsers": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['displayName', 'rating', 'wins', 'losses', 'draws', 'games']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 16 && newData.child('rating').isNumber() && newData.child('rating').val() >= 0 && newData.child('rating').val() <= 10000 && newData.child('wins').isNumber() && newData.child('wins').val() >= 0 && newData.child('losses').isNumber() && newData.child('losses').val() >= 0 && newData.child('draws').isNumber() && newData.child('draws').val() >= 0 && newData.child('games').val() == newData.child('wins').val() + newData.child('losses').val() + newData.child('draws').val()",
+        "processedMatches": {
+          "$matchId": {
+            ".validate": "newData.val() == true"
+          }
+        }
+      }
+    },
+    "rankings": {
+      ".read": true,
+      ".indexOn": ["rating"],
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['displayName', 'rating', 'wins', 'losses', 'draws', 'games']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 16 && newData.child('rating').isNumber() && newData.child('rating').val() >= 0 && newData.child('rating').val() <= 10000 && newData.child('wins').isNumber() && newData.child('wins').val() >= 0 && newData.child('losses').isNumber() && newData.child('losses').val() >= 0 && newData.child('draws').isNumber() && newData.child('draws').val() >= 0 && newData.child('games').val() == newData.child('wins').val() + newData.child('losses').val() + newData.child('draws').val()"
       }
     }
   }
