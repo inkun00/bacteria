@@ -24,6 +24,8 @@ export type OnlinePlayer = {
   connected: boolean;
 };
 
+export type OnlineMatchSize = 2 | 4;
+
 export type OnlineMoveResult = {
   board: Cell[];
   numbers: NumberCell[];
@@ -65,6 +67,7 @@ export type OnlineGameMessage =
 type RoomRecord = {
   hostId?: string;
   boardSize?: BoardSize;
+  matchSize?: OnlineMatchSize;
   status?: "waiting" | "playing";
   players?: Record<string, Omit<OnlinePlayer, "uid" | "connected"> & { joinedAt?: number }>;
 };
@@ -79,7 +82,7 @@ type OnlineRoomStatus = "idle" | "joining" | "waiting" | "connecting" | "ready" 
 
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ROOM_CODE_LENGTH = 6;
-const MAX_PLAYERS = 4;
+const DEFAULT_MATCH_SIZE: OnlineMatchSize = 4;
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
 ];
@@ -141,6 +144,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const [hostUid, setHostUid] = useState("");
   const [localSlot, setLocalSlot] = useState<number | null>(null);
   const [roomBoardSize, setRoomBoardSize] = useState<BoardSize>(7);
+  const [matchSize, setMatchSize] = useState<OnlineMatchSize>(DEFAULT_MATCH_SIZE);
   const appRef = useRef<FirebaseApp | null>(null);
   const databaseRef = useRef<Database | null>(null);
   const roomCodeRef = useRef("");
@@ -171,11 +175,11 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const updateReadyStatus = useCallback(() => {
     const openChannels = [...dataChannels.current.values()].filter((channel) => channel.readyState === "open").length;
     if (isHostRef.current) {
-      setStatus(players.length === MAX_PLAYERS && openChannels === MAX_PLAYERS - 1 ? "ready" : openChannels ? "connecting" : "waiting");
+      setStatus(players.length === matchSize && openChannels === matchSize - 1 ? "ready" : openChannels ? "connecting" : "waiting");
     } else {
       setStatus(openChannels === 1 ? "ready" : "connecting");
     }
-  }, [players.length]);
+  }, [matchSize, players.length]);
 
   const sendSignal = useCallback(async (recipientUid: string, signal: Omit<SignalRecord, "from">) => {
     const database = databaseRef.current;
@@ -306,6 +310,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
         .sort((left, right) => left.slot - right.slot);
       setPlayers(nextPlayers);
       setRoomBoardSize(room.boardSize ?? 7);
+      setMatchSize(room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE);
       hostUidRef.current = room.hostId ?? "";
       setHostUid(room.hostId ?? "");
       const mine = nextPlayers.find((player) => player.uid === uid);
@@ -353,7 +358,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     leavingRef.current = false;
   }, []);
 
-  const createRoom = useCallback(async (name: string, boardSize: BoardSize) => {
+  const createRoom = useCallback(async (name: string, boardSize: BoardSize, requestedMatchSize: OnlineMatchSize) => {
     await leave();
     setStatus("joining");
     setError(null);
@@ -365,6 +370,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
         const result = await runTransaction(ref(database, `rooms/${candidate}`), (current) => current === null ? {
           hostId: uid,
           boardSize,
+          matchSize: requestedMatchSize,
           status: "waiting",
           createdAt: serverTimestamp(),
           players: { [uid]: { name: cleanName(name), slot: 0, joinedAt: serverTimestamp() } },
@@ -383,6 +389,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       setHostUid(uid);
       setLocalSlot(0);
       setRoomBoardSize(boardSize);
+      setMatchSize(requestedMatchSize);
       subscribeToRoom(database, code, uid);
       await onDisconnect(ref(database, `rooms/${code}`)).remove();
       setStatus("waiting");
@@ -403,9 +410,11 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       const result = await runTransaction(ref(database, `rooms/${code}`), (current: RoomRecord | null) => {
         if (!current || current.status !== "waiting") return;
         const currentPlayers = current.players ?? {};
+        const roomMatchSize = current.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
         if (currentPlayers[uid]) return current;
         const usedSlots = new Set(Object.values(currentPlayers).map((player) => player.slot));
-        const slot = [1, 2, 3].find((candidate) => !usedSlots.has(candidate));
+        const slot = Array.from({ length: roomMatchSize - 1 }, (_, index) => index + 1)
+          .find((candidate) => !usedSlots.has(candidate));
         if (slot === undefined) return;
         return {
           ...current,
@@ -426,6 +435,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       setHostUid(room.hostId ?? "");
       setLocalSlot(slot);
       setRoomBoardSize(room.boardSize ?? 7);
+      setMatchSize(room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE);
       subscribeToRoom(database, code, uid);
       await onDisconnect(ref(database, `rooms/${code}/players/${uid}`)).remove();
       setStatus("connecting");
@@ -479,11 +489,12 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     error,
     roomCode,
     roomBoardSize,
+    matchSize,
     players,
     localUid,
     localSlot,
     isHost: Boolean(localUid && localUid === hostUid),
-    allConnected: players.length === MAX_PLAYERS && players.every((player) => player.connected),
+    allConnected: players.length === matchSize && players.every((player) => player.connected),
     createRoom,
     joinRoom,
     leave,

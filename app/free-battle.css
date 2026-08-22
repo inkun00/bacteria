@@ -359,6 +359,14 @@
 .free-battle .online-lobby label span { color: #89a99e; font-size: 9px; font-weight: 700; }
 .free-battle .online-lobby input { min-width: 0; height: 43px; padding: 0 12px; border: 1px solid rgba(116,177,157,.3); border-radius: 8px; outline: 0; color: #effff9; background: rgba(3,20,16,.8); font: 700 12px var(--font-geist-mono), monospace; text-transform: uppercase; }
 .free-battle .online-lobby input:focus { border-color: rgba(53,234,211,.7); box-shadow: 0 0 0 3px rgba(53,234,211,.08); }
+.free-battle .match-size-select { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; margin-bottom: 13px; }
+.free-battle .match-size-select > div { display: grid; align-content: center; gap: 3px; padding: 0 5px; }
+.free-battle .match-size-select > div span { color: #d9eee7; font-size: 10px; font-weight: 800; }
+.free-battle .match-size-select > div small { color: #66877c; font-size: 7px; }
+.free-battle .match-size-select button { min-height: 52px; display: grid; place-items: center; align-content: center; gap: 3px; border: 1px solid rgba(112,158,143,.24); border-radius: 8px; color: #77968c; background: rgba(100,160,140,.035); cursor: pointer; }
+.free-battle .match-size-select button.selected { border-color: rgba(53,234,211,.6); color: #eafff9; background: rgba(53,234,211,.1); box-shadow: inset 0 0 18px rgba(53,234,211,.05); }
+.free-battle .match-size-select button b { font: 900 14px var(--font-geist-mono), monospace; }
+.free-battle .match-size-select button small { color: #63847a; font-size: 7px; }
 .free-battle .online-entry-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 9px; margin-top: 12px; }
 .free-battle .online-entry-actions > button, .free-battle .online-entry-actions > div { min-height: 58px; border: 1px solid rgba(53,234,211,.3); border-radius: 9px; background: rgba(53,234,211,.06); }
 .free-battle .online-entry-actions > button { display: grid; align-content: center; gap: 3px; color: #dffff8; cursor: pointer; }
@@ -540,6 +548,8 @@
   .free-battle .hero-germ { width: 82px; }
   .free-battle .mode-tabs { grid-template-columns: 1fr; }
   .free-battle .online-entry-actions { grid-template-columns: 1fr; }
+  .free-battle .match-size-select { grid-template-columns: 1fr 1fr; }
+  .free-battle .match-size-select > div { grid-column: 1 / -1; text-align: center; }
   .free-battle .online-slots { grid-template-columns: 1fr 1fr; }
   .free-battle .room-code-card { grid-template-columns: auto 1fr; }
   .free-battle .room-code-card button { grid-column: 1 / -1; }

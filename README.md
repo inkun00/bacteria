@@ -18,7 +18,7 @@ npm run build
 
 ## Firebase + WebRTC 온라인 2:2 설정
 
-온라인 대전은 Firebase Realtime Database를 방 찾기와 WebRTC 시그널링에만 사용합니다. 실제 게임 데이터는 TURN 없이 플레이어와 방장 사이의 WebRTC DataChannel로 직접 전달됩니다.
+온라인 대전은 방장이 1:1 또는 2:2를 선택할 수 있습니다. Firebase Realtime Database는 방 찾기와 WebRTC 시그널링에만 사용하며 실제 게임 데이터는 TURN 없이 플레이어와 방장 사이의 WebRTC DataChannel로 직접 전달됩니다.
 
 1. Firebase 콘솔에서 웹 앱과 Realtime Database를 만듭니다.
 2. Authentication의 로그인 제공업체에서 `익명` 로그인을 활성화합니다.

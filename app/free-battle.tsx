@@ -5,6 +5,7 @@ import {
   teamForSlot,
   useOnlineRoom,
   type OnlineGameMessage,
+  type OnlineMatchSize,
   type OnlineMoveResult,
 } from "./online-room";
 import {
@@ -176,6 +177,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [notice, setNotice] = useState("내 세균을 고른 뒤 약수·배수·분열 중 하나를 선택하세요");
   const [onlineName, setOnlineName] = useState("연구원");
   const [onlineJoinCode, setOnlineJoinCode] = useState("");
+  const [onlineMatchSize, setOnlineMatchSize] = useState<OnlineMatchSize>(4);
   const [activeSlot, setActiveSlot] = useState(0);
   const audioRef = useRef<AudioContext | null>(null);
   const infectionSfxRef = useRef<HTMLAudioElement | null>(null);
@@ -656,8 +658,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         handledOnlineRequests.current.add(message.requestId);
         const result = applyMove(board, numbers, player, message.move, message.mode, { forceInfection: message.useBomb });
         let nextSlot = activeSlot;
-        for (let offset = 1; offset <= 4; offset += 1) {
-          const candidate = (activeSlot + offset) % 4;
+        for (let offset = 1; offset <= online.matchSize; offset += 1) {
+          const candidate = (activeSlot + offset) % online.matchSize;
           if (legalMoves(result.board, teamForSlot(candidate)).length) {
             nextSlot = candidate;
             break;
@@ -776,7 +778,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   };
 
   const createOnlineRoom = () => {
-    void online.createRoom(onlineName, draftSettings.boardSize);
+    void online.createRoom(onlineName, draftSettings.boardSize, onlineMatchSize);
   };
 
   const joinOnlineRoom = () => {
@@ -804,7 +806,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const gameLabel = settings.mode === "ai"
     ? `컴퓨터 · ${DIFFICULTY[settings.difficulty].label} · ${boardSize}×${boardSize}`
     : settings.mode === "online"
-    ? `온라인 2:2 · ${online.roomCode} · ${boardSize}×${boardSize}`
+    ? `온라인 ${online.matchSize === 2 ? "1:1" : "2:2"} · ${online.roomCode} · ${boardSize}×${boardSize}`
     : `친구와 하기 · ${boardSize}×${boardSize}`;
   const displayedCharge: [number, number] = [
     chargeBurst === 1 ? 5 : bombCharge[0],
@@ -1038,7 +1040,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                 <span className="tab-icon">◎</span><span><b>친구와 하기</b><small>한 화면에서 둘이 해요</small></span>
               </button>
               <button className={draftSettings.mode === "online" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "online" }))}>
-                <span className="tab-icon">⌁</span><span><b>온라인 2:2</b><small>방 코드로 네 명이 대전해요</small></span>
+                <span className="tab-icon">⌁</span><span><b>온라인 대전</b><small>1:1 또는 2:2 방을 만들어요</small></span>
               </button>
             </div>
 
@@ -1079,6 +1081,15 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                   </div>
                 ) : !online.roomCode ? (
                   <>
+                    <div className="match-size-select" role="group" aria-label="방을 만들 때 사용할 대전 인원">
+                      <div><span>대전 방식</span><small>새 방을 만들 때 적용됩니다</small></div>
+                      <button className={onlineMatchSize === 2 ? "selected" : ""} onClick={() => setOnlineMatchSize(2)}>
+                        <b>1 : 1</b><small>플레이어 2명</small>
+                      </button>
+                      <button className={onlineMatchSize === 4 ? "selected" : ""} onClick={() => setOnlineMatchSize(4)}>
+                        <b>2 : 2</b><small>플레이어 4명</small>
+                      </button>
+                    </div>
                     <label>
                       <span>표시 이름</span>
                       <input value={onlineName} maxLength={16} onChange={(event) => setOnlineName(event.target.value)} placeholder="연구원 이름" />
@@ -1102,11 +1113,11 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                 ) : (
                   <>
                     <div className="room-code-card">
-                      <span>방 코드</span><strong>{online.roomCode}</strong>
+                      <span>방 코드 · {online.matchSize === 2 ? "1:1" : "2:2"}</span><strong>{online.roomCode}</strong>
                       <button onClick={() => void navigator.clipboard?.writeText(online.roomCode)}>복사</button>
                     </div>
                     <div className="online-slots">
-                      {[0, 1, 2, 3].map((slot) => {
+                      {Array.from({ length: online.matchSize }, (_, slot) => slot).map((slot) => {
                         const player = online.players.find((candidate) => candidate.slot === slot);
                         return (
                           <div key={slot} className={`${teamForSlot(slot) === 1 ? "blue" : "red"} ${player?.connected ? "connected" : ""}`}>
@@ -1119,7 +1130,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                     </div>
                     <p className="direct-only-note">TURN 없이 직접 연결만 사용합니다. 연결되지 않으면 다른 네트워크에서 다시 참가해주세요.</p>
                     {online.isHost ? (
-                      <button className="online-start" onClick={startOnlineBattle} disabled={!online.allConnected}>네 명 모두 연결되면 대전 시작</button>
+                      <button className="online-start" onClick={startOnlineBattle} disabled={!online.allConnected}>{online.matchSize}명 모두 연결되면 대전 시작</button>
                     ) : (
                       <div className="online-waiting">방장이 대전을 시작하기를 기다리고 있어요</div>
                     )}
