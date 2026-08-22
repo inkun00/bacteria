@@ -3,15 +3,12 @@
 /* eslint-disable @next/next/no-img-element -- Static badge images in printable PDF layout */
 
 import { useCallback, useState } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { assetUrl } from "./assets";
 import { type WorksheetReport } from "./worksheet-generator";
 
 export async function exportWorksheetToPdf(report: WorksheetReport): Promise<void> {
-  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-    import("jspdf"),
-    import("html2canvas"),
-  ]);
-
   const container = document.getElementById("factor-force-pdf-render-root");
   if (!container) {
     throw new Error("PDF 렌더링 요소를 찾을 수 없습니다.");

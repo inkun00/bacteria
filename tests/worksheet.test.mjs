@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { build } from "esbuild";
@@ -132,4 +133,11 @@ test("buildWorksheetReport deduplicates incorrect questions and supplements up t
   assert.equal(report.problems[1].originalTask.id, task2.id);
   assert.ok(report.problems[0].similarTask.prompt.length > 0);
   assert.ok(report.problems[0].similarTask.answer.length > 0);
+});
+
+test("PDF libraries load with the page instead of a deployment-sensitive dynamic chunk", async () => {
+  const source = await readFile(new URL("../app/pdf-report.tsx", import.meta.url), "utf8");
+  assert.match(source, /import html2canvas from "html2canvas"/);
+  assert.match(source, /import jsPDF from "jspdf"/);
+  assert.doesNotMatch(source, /import\("(?:jspdf|html2canvas)"\)/);
 });
