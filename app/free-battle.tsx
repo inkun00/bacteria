@@ -1263,23 +1263,6 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                     </>
                   )}
                 </div>
-                {!online.roomCode && (
-                  <div className="online-board-select">
-                    <div><span>게임판 크기</span></div>
-                    {BOARD_SIZES.map((size) => <button key={size} className={draftSettings.boardSize === size ? "selected" : ""} type="button" onClick={() => setDraftSettings((value) => ({ ...value, boardSize: size }))}><b>{size} × {size}</b></button>)}
-                  </div>
-                )}
-                {!online.roomCode && (
-                  <div className="match-size-select" role="group" aria-label="방을 만들 때 사용할 대전 인원">
-                    <div><span>대전 방식</span></div>
-                    <button className={onlineMatchSize === 2 ? "selected" : ""} onClick={() => setOnlineMatchSize(2)}>
-                      <b>1 : 1</b>
-                    </button>
-                    <button className={onlineMatchSize === 4 ? "selected" : ""} onClick={() => setOnlineMatchSize(4)}>
-                      <b>2 : 2</b>
-                    </button>
-                  </div>
-                )}
                 {!online.roomCode && ranked.profile && online.configured && (
                   <section className="room-browser" aria-labelledby="room-browser-title">
                     <header>
@@ -1461,9 +1444,24 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
             <button className="account-modal-close" type="button" onClick={() => setRoomCreateOpen(false)} aria-label="방 만들기 창 닫기">×</button>
             <small>ONLINE BATTLE // CREATE ROOM</small>
             <h2 id="room-create-title">새 대전방 만들기</h2>
-            <p>목록에서 알아보기 쉬운 방 제목을 입력하세요. 비밀번호는 원하는 경우에만 설정할 수 있습니다.</p>
+            <p>방 제목, 게임판 크기와 대전 방식을 정하세요. 비밀번호는 선택 사항입니다.</p>
             <form onSubmit={submitCreateOnlineRoom}>
               <label><span>방 제목 <em>필수</em></span><input value={newRoomTitle} maxLength={30} autoFocus onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="예: 약수 고수만 오세요" required /></label>
+              <fieldset className="room-option-group room-create-board-size">
+                <legend>게임판 크기</legend>
+                <div className="room-option-grid three">
+                  {BOARD_SIZES.map((size) => (
+                    <button key={size} className={draftSettings.boardSize === size ? "selected" : ""} type="button" aria-pressed={draftSettings.boardSize === size} onClick={() => setDraftSettings((value) => ({ ...value, boardSize: size }))}>{size} × {size}</button>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="room-option-group room-create-match-size">
+                <legend>대전 방식</legend>
+                <div className="room-option-grid two">
+                  <button className={onlineMatchSize === 2 ? "selected" : ""} type="button" aria-pressed={onlineMatchSize === 2} onClick={() => setOnlineMatchSize(2)}>1 : 1</button>
+                  <button className={onlineMatchSize === 4 ? "selected" : ""} type="button" aria-pressed={onlineMatchSize === 4} onClick={() => setOnlineMatchSize(4)}>2 : 2</button>
+                </div>
+              </fieldset>
               <label className="room-password-toggle"><input type="checkbox" checked={roomPasswordEnabled} onChange={(event) => { setRoomPasswordEnabled(event.target.checked); if (!event.target.checked) setNewRoomPassword(""); }} /><span><b>비밀번호 사용</b><small>체크하면 비밀번호를 아는 사람만 참가할 수 있어요.</small></span></label>
               {roomPasswordEnabled && <label><span>방 비밀번호</span><input type="password" value={newRoomPassword} minLength={4} maxLength={20} autoComplete="new-password" onChange={(event) => setNewRoomPassword(event.target.value)} placeholder="4~20자" required /></label>}
               <div className="room-modal-summary"><span>{onlineMatchSize === 2 ? "1 : 1" : "2 : 2"}</span><span>{draftSettings.boardSize}×{draftSettings.boardSize} 보드</span><span>{roomPasswordEnabled ? "비공개" : "공개"}</span></div>

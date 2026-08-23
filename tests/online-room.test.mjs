@@ -73,6 +73,8 @@ test("free battle exposes room creation, joining, and four connected slots", asy
   assert.match(source, /tab-icon" aria-hidden="true">👥/);
   assert.match(source, /tab-icon" aria-hidden="true">🌐/);
   assert.match(source, /방 제목 <em>필수<\/em>/);
+  assert.match(source, /room-create-modal[\s\S]*room-create-board-size[\s\S]*room-create-match-size/);
+  assert.doesNotMatch(source, /!online\.roomCode && \(\s*<div className="online-board-select"/);
   assert.match(source, /비밀번호 사용/);
   assert.match(source, /방 비밀번호 입력/);
   assert.match(source, /room\.hasPassword/);

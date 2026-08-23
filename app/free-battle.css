@@ -509,6 +509,14 @@
 .free-battle .room-create-modal, .free-battle .room-password-modal { border-color: rgba(53,234,211,.34); box-shadow: 0 35px 100px rgba(0,0,0,.7),0 0 60px rgba(53,234,211,.08); }
 .free-battle .room-create-modal > small, .free-battle .room-password-modal > small { color: var(--cyan); }
 .free-battle .room-create-modal label span em { margin-left: 5px; color: #ffaf77; font-size: 7px; font-style: normal; }
+.free-battle .room-option-group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.free-battle .room-option-group legend { margin-bottom: 8px; color: #dffaf1; font-size: 16px; font-weight: 800; }
+.free-battle .room-option-grid { display: grid; gap: 7px; }
+.free-battle .room-option-grid.three { grid-template-columns: repeat(3,1fr); }
+.free-battle .room-option-grid.two { grid-template-columns: repeat(2,1fr); }
+.free-battle .room-option-grid button { min-height: 48px; border: 1px solid rgba(112,158,143,.28); border-radius: 8px; color: #91aea5; background: rgba(100,160,140,.04); font: 900 17px var(--font-geist-mono),monospace; cursor: pointer; }
+.free-battle .room-option-grid button.selected { border-color: rgba(53,234,211,.72); color: #eafff9; background: rgba(53,234,211,.12); box-shadow: inset 0 0 20px rgba(53,234,211,.07); }
+.free-battle .room-option-grid button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .free-battle .room-password-toggle { grid-template-columns: 20px 1fr; align-items: center; padding: 11px; border: 1px solid rgba(112,158,143,.2); border-radius: 9px; background: rgba(2,17,14,.5); cursor: pointer; }
 .free-battle .account-modal .room-password-toggle input { width: 17px; height: 17px; padding: 0; accent-color: var(--cyan); }
 .free-battle .room-password-toggle > span { display: grid; gap: 3px; }
