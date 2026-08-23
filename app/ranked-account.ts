@@ -202,6 +202,44 @@ export function useRankedAccount() {
     setProfile(null);
   }, []);
 
+  const updateDisplayName = useCallback(async (displayName: string) => {
+    const currentUser = user;
+    const currentProfile = profile;
+    const name = cleanDisplayName(displayName);
+    if (!currentUser || !currentProfile) throw new Error("로그인 후 닉네임을 수정할 수 있습니다.");
+    if (!name) throw new Error("닉네임을 입력해주세요.");
+    setBusy(true);
+    setError(null);
+    try {
+      const { database } = await getFirebaseClient();
+      await updateProfile(currentUser, { displayName: name });
+      const privateReference = ref(database, `rankedUsers/${currentUser.uid}`);
+      const result = await runTransaction(privateReference, (current) => {
+        const previous = current as PrivateRankedRecord | null;
+        const base = normalizeProfile(currentUser.uid, previous, currentProfile.displayName);
+        return {
+          ...(previous ?? {}),
+          displayName: name,
+          rating: base.rating,
+          wins: base.wins,
+          losses: base.losses,
+          draws: base.draws,
+          games: base.games,
+          updatedAt: Date.now(),
+        } satisfies PrivateRankedRecord;
+      }, { applyLocally: false });
+      const updated = normalizeProfile(currentUser.uid, result.snapshot.val() as PrivateRankedRecord, name);
+      await set(ref(database, `rankings/${currentUser.uid}`), publicProfile(updated));
+      return name;
+    } catch (reason) {
+      const message = authErrorMessage(reason);
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setBusy(false);
+    }
+  }, [profile, user]);
+
   const recordResult = useCallback(async (matchId: string, outcome: MatchOutcome, opponentRating: number) => {
     const currentUser = user;
     if (!currentUser || currentUser.isAnonymous || !profile) return null;
@@ -231,5 +269,5 @@ export function useRankedAccount() {
     return updated.rating - profile.rating;
   }, [profile, user]);
 
-  return { configured, user, profile, leaderboard, ready, busy, error, createAccount, login, logout, recordResult };
+  return { configured, user, profile, leaderboard, ready, busy, error, createAccount, login, logout, updateDisplayName, recordResult };
 }

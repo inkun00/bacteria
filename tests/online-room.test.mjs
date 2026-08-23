@@ -30,7 +30,7 @@ test("online 2v2 uses Firebase signaling and STUN-only WebRTC", async () => {
   assert.match(source, /passwordHash !== initialRoom\.passwordHash/);
 });
 
-test("ranked accounts persist Elo MMR and expose a top-50 leaderboard", async () => {
+test("ranked accounts persist points, nicknames, and expose a top-50 leaderboard", async () => {
   const accountSource = await readFile(new URL("../app/ranked-account.ts", import.meta.url), "utf8");
   const battleSource = await readFile(new URL("../app/free-battle.tsx", import.meta.url), "utf8");
   const rules = await readFile(new URL("../firebase/database.rules.json", import.meta.url), "utf8");
@@ -39,7 +39,16 @@ test("ranked accounts persist Elo MMR and expose a top-50 leaderboard", async ()
   assert.match(accountSource, /processedMatches/);
   assert.match(accountSource, /Math\.round\(32 \* \(actual - expected\)\)/);
   assert.match(accountSource, /limitToLast\(50\)/);
+  assert.match(accountSource, /updateDisplayName/);
+  assert.match(accountSource, /updateProfile\(currentUser, \{ displayName: name \}\)/);
   assert.match(battleSource, /온라인 랭킹 TOP 50/);
+  assert.match(battleSource, /온라인 배틀넷/);
+  assert.match(battleSource, /마이페이지/);
+  assert.match(battleSource, /계정생성하기/);
+  assert.match(battleSource, /포인트 \{ranked\.profile\.rating\}/);
+  assert.doesNotMatch(battleSource, />MMR</);
+  assert.doesNotMatch(battleSource, /방어대 계정 만들기/);
+  assert.doesNotMatch(battleSource, /온라인 경기의 MMR, 티어와 승패 기록/);
   assert.match(battleSource, /matchId: crypto\.randomUUID\(\)/);
   assert.match(rules, /"rankedUsers"/);
   assert.match(rules, /"rankings"/);
