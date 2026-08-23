@@ -7,7 +7,7 @@
       ".indexOn": ["status", "createdAt"],
       "$roomCode": {
         ".read": "auth != null",
-        ".write": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('hostId').val() == auth.uid) || (data.exists() && data.child('hostId').val() == auth.uid))",
         ".validate": "newData.hasChildren(['hostId', 'boardSize', 'matchSize', 'status', 'players']) && newData.child('hostId').isString() && (newData.child('boardSize').val() == 7 || newData.child('boardSize').val() == 9 || newData.child('boardSize').val() == 11) && (newData.child('matchSize').val() == 2 || newData.child('matchSize').val() == 4) && (newData.child('status').val() == 'waiting' || newData.child('status').val() == 'playing')",
         "title": {
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
@@ -20,17 +20,20 @@
         },
         "players": {
           "$uid": {
+            ".write": "auth != null && (auth.uid == $uid || root.child('rooms').child($roomCode).child('hostId').val() == auth.uid)",
             ".validate": "newData.hasChildren(['name', 'slot', 'rating']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 16 && newData.child('slot').isNumber() && newData.child('slot').val() >= 0 && newData.child('slot').val() < newData.parent().parent().child('matchSize').val() && newData.child('rating').isNumber() && newData.child('rating').val() >= 0 && newData.child('rating').val() <= 10000"
           }
         },
         "slotOwners": {
           "$slotKey": {
+            ".write": "auth != null && (root.child('rooms').child($roomCode).child('hostId').val() == auth.uid || (!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && !newData.exists()))",
             ".validate": "newData.isString()"
           }
         },
         "signals": {
           "$recipientUid": {
             "$signalId": {
+              ".write": "auth != null && ((newData.exists() && newData.child('from').val() == auth.uid) || (!newData.exists() && (data.child('from').val() == auth.uid || $recipientUid == auth.uid)))",
               ".validate": "newData.hasChild('from') && newData.child('from').isString()"
             }
           }
@@ -40,12 +43,29 @@
     "rankedUsers": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid && (!data.exists() || ((!data.child('suspendedUntil').exists() || data.child('suspendedUntil').val() <= now || (newData.child('suspendedUntil').exists() && newData.child('suspendedUntil').val() >= data.child('suspendedUntil').val())) && (!data.child('fairPlayWarnings').exists() || newData.child('fairPlayWarnings').val() >= data.child('fairPlayWarnings').val()) && newData.child('games').val() >= data.child('games').val() && newData.child('games').val() <= data.child('games').val() + 1 && newData.child('wins').val() >= data.child('wins').val() && newData.child('wins').val() <= data.child('wins').val() + 1 && newData.child('losses').val() >= data.child('losses').val() && newData.child('losses').val() <= data.child('losses').val() + 1 && newData.child('draws').val() >= data.child('draws').val() && newData.child('draws').val() <= data.child('draws').val() + 1 && newData.child('rating').val() >= data.child('rating').val() - 32 && newData.child('rating').val() <= data.child('rating').val() + 32))",
         ".validate": "newData.hasChildren(['displayName', 'rating', 'wins', 'losses', 'draws', 'games']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 16 && newData.child('rating').isNumber() && newData.child('rating').val() >= 0 && newData.child('rating').val() <= 10000 && newData.child('wins').isNumber() && newData.child('wins').val() >= 0 && newData.child('losses').isNumber() && newData.child('losses').val() >= 0 && newData.child('draws').isNumber() && newData.child('draws').val() >= 0 && newData.child('games').val() == newData.child('wins').val() + newData.child('losses').val() + newData.child('draws').val()",
         "processedMatches": {
           "$matchId": {
             ".validate": "newData.val() == true"
           }
+        },
+        "matchHistory": {
+          "$matchId": {
+            ".validate": "newData.hasChildren(['startedAt', 'endedAt', 'durationSeconds', 'turns', 'outcome', 'endReason', 'opponentIds']) && newData.child('startedAt').isNumber() && newData.child('endedAt').isNumber() && newData.child('durationSeconds').isNumber() && newData.child('durationSeconds').val() >= 0 && newData.child('turns').isNumber() && newData.child('turns').val() >= 0 && (newData.child('outcome').val() == 'win' || newData.child('outcome').val() == 'loss' || newData.child('outcome').val() == 'draw' || newData.child('outcome').val() == 'void') && (newData.child('endReason').val() == 'completed' || newData.child('endReason').val() == 'forfeit' || newData.child('endReason').val() == 'void')"
+          }
+        },
+        "suspiciousWinStreak": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "fairPlayWarnings": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "fairPlayMessage": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "suspendedUntil": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
         }
       }
     },
@@ -54,7 +74,7 @@
       ".indexOn": ["rating"],
       "$uid": {
         ".write": "auth != null && auth.uid == $uid",
-        ".validate": "newData.hasChildren(['displayName', 'rating', 'wins', 'losses', 'draws', 'games']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 16 && newData.child('rating').isNumber() && newData.child('rating').val() >= 0 && newData.child('rating').val() <= 10000 && newData.child('wins').isNumber() && newData.child('wins').val() >= 0 && newData.child('losses').isNumber() && newData.child('losses').val() >= 0 && newData.child('draws').isNumber() && newData.child('draws').val() >= 0 && newData.child('games').val() == newData.child('wins').val() + newData.child('losses').val() + newData.child('draws').val()"
+        ".validate": "newData.hasChildren(['displayName', 'rating', 'wins', 'losses', 'draws', 'games']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 16 && newData.child('rating').isNumber() && newData.child('rating').val() >= 0 && newData.child('rating').val() <= 10000 && newData.child('wins').isNumber() && newData.child('wins').val() >= 0 && newData.child('losses').isNumber() && newData.child('losses').val() >= 0 && newData.child('draws').isNumber() && newData.child('draws').val() >= 0 && newData.child('games').val() == newData.child('wins').val() + newData.child('losses').val() + newData.child('draws').val() && newData.child('displayName').val() == root.child('rankedUsers').child($uid).child('displayName').val() && newData.child('rating').val() == root.child('rankedUsers').child($uid).child('rating').val() && newData.child('wins').val() == root.child('rankedUsers').child($uid).child('wins').val() && newData.child('losses').val() == root.child('rankedUsers').child($uid).child('losses').val() && newData.child('draws').val() == root.child('rankedUsers').child($uid).child('draws').val() && newData.child('games').val() == root.child('rankedUsers').child($uid).child('games').val()"
       }
     }
   }

@@ -7,6 +7,7 @@ import {
   type OnlineGameMessage,
   type OnlineMatchSize,
   type OnlineMoveResult,
+  type OnlinePlayer,
   type OnlineRoomSummary,
 } from "./online-room";
 import {
@@ -28,7 +29,7 @@ import {
   type Player,
   type RelationMode,
 } from "./game";
-import { ratingTier, ratingTierBadge, useRankedAccount } from "./ranked-account";
+import { ratingTier, ratingTierBadge, useRankedAccount, type MatchEndReason, type MatchOutcome } from "./ranked-account";
 
 type Mode = "ai" | "local" | "online";
 type Settings = { mode: Mode; difficulty: Difficulty; boardSize: BoardSize };
@@ -190,6 +191,9 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [joinRoomPassword, setJoinRoomPassword] = useState("");
   const [activeSlot, setActiveSlot] = useState(0);
   const [onlineMatchId, setOnlineMatchId] = useState("");
+  const [onlineMatchPlayers, setOnlineMatchPlayers] = useState<OnlinePlayer[]>([]);
+  const [onlineStartedAt, setOnlineStartedAt] = useState(0);
+  const [onlineEndReason, setOnlineEndReason] = useState<MatchEndReason>("completed");
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountMode, setAccountMode] = useState<"login" | "create">("login");
   const [accountEmail, setAccountEmail] = useState("");
@@ -650,6 +654,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     setAnimating(false);
     setGameOver(false);
     setWinner(0);
+    setOnlineEndReason("completed");
     setMoveNumber(1);
     setElapsed(0);
     setCaptures([0, 0]);
@@ -676,12 +681,40 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
         if (!online.isHost && senderUid !== hostUid) return;
         setActiveSlot(message.activeSlot);
         setOnlineMatchId(message.matchId);
+        setOnlineMatchPlayers(online.players);
+        setOnlineStartedAt(message.startedAt);
+        setOnlineEndReason("completed");
         setRatingDelta(null);
         handledOnlineRequests.current.clear();
         startGame(
           { mode: "online", difficulty: "medium", boardSize: message.boardSize },
           { board: message.board, numbers: message.numbers },
         );
+        return;
+      }
+
+      if (message.kind === "player-left") {
+        if (settings.mode !== "online" || !onlineMatchId || gameOver) return;
+        const completedTurns = Math.max(0, moveNumber - 1);
+        clearSequenceTimers();
+        setAnimating(false);
+        setThinking(false);
+        setSelected(null);
+        setInfection(null);
+        setResisted([]);
+        setProjectiles([]);
+        if (completedTurns <= 3) {
+          setWinner(0);
+          setOnlineEndReason("void");
+          setNotice(`${completedTurns}턴 이내에 플레이어가 나가 승패 기록 없이 종료됩니다.`);
+        } else {
+          const losingTeam = teamForSlot(message.slot);
+          const winningTeam: Player = losingTeam === 1 ? 2 : 1;
+          setWinner(winningTeam);
+          setOnlineEndReason("forfeit");
+          setNotice(`${losingTeam === 1 ? "파란" : "빨간"} 팀이 먼저 나가 패배 처리되었습니다.`);
+        }
+        setGameOver(true);
         return;
       }
 
@@ -733,7 +766,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     return () => {
       onlineMessageHandlerRef.current = () => undefined;
     };
-  }, [activeSlot, animating, board, bombs, currentPlayer, executeMove, gameOver, numbers, online, startGame]);
+  }, [activeSlot, animating, board, bombs, clearSequenceTimers, currentPlayer, executeMove, gameOver, moveNumber, numbers, online, onlineMatchId, settings.mode, startGame]);
 
   const requestExit = useCallback(() => {
     if (gameInProgress) {
@@ -745,14 +778,38 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     onExit();
   }, [gameInProgress, onExit, online]);
 
-  const stopAndExit = useCallback(() => {
+  const recordOwnDeparture = useCallback(async () => {
+    if (settings.mode !== "online" || !onlineMatchId || !ranked.profile || online.localSlot === null) return;
+    if (settledMatchRef.current === onlineMatchId) return;
+    settledMatchRef.current = onlineMatchId;
+    const myTeam = teamForSlot(online.localSlot);
+    const participants = onlineMatchPlayers.length ? onlineMatchPlayers : online.players;
+    const opponents = participants.filter((player) => teamForSlot(player.slot) !== myTeam);
+    const opponentRating = opponents.length
+      ? opponents.reduce((total, player) => total + player.rating, 0) / opponents.length
+      : ranked.profile.rating;
+    const completedTurns = Math.max(0, moveNumber - 1);
+    await ranked.recordMatch(onlineMatchId, completedTurns <= 3 ? null : "loss", opponentRating, {
+      startedAt: onlineStartedAt || Date.now() - elapsed * 1000,
+      durationSeconds: elapsed,
+      turns: completedTurns,
+      endReason: completedTurns <= 3 ? "void" : "forfeit",
+      opponentIds: opponents.map((player) => player.uid),
+    }).catch(() => null);
+  }, [elapsed, moveNumber, online.localSlot, online.players, onlineMatchId, onlineMatchPlayers, onlineStartedAt, ranked, settings.mode]);
+
+  const stopAndExit = useCallback(async () => {
     window.localStorage.removeItem(SAVED_GAME_KEY);
     window.sessionStorage.removeItem(SAVED_GAME_KEY);
-    if (settings.mode === "online") void online.leave();
+    if (settings.mode === "online") {
+      const recordPromise = recordOwnDeparture();
+      await online.leave();
+      await recordPromise;
+    }
     setGameStarted(false);
     setExitPromptOpen(false);
     onExit();
-  }, [onExit, online, settings.mode]);
+  }, [onExit, online, recordOwnDeparture, settings.mode]);
 
   const handleCell = (index: number) => {
     if (gameOver || restartPromptOpen || exitPromptOpen || thinking || animating || (settings.mode === "ai" && currentPlayer === 2)) return;
@@ -826,6 +883,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       setAccountFeedback("랭크 방을 만들려면 먼저 로그인해주세요.");
       return;
     }
+    if (ranked.suspended) {
+      setAccountFeedback(ranked.suspensionMessage ?? "온라인 대전 계정이 일시 정지되었습니다.");
+      return;
+    }
     setNewRoomTitle("");
     setRoomPasswordEnabled(false);
     setNewRoomPassword("");
@@ -852,6 +913,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
 
   const attemptJoinRoom = async (code: string, password = "") => {
     if (!ranked.profile) return;
+    if (ranked.suspended) {
+      setAccountFeedback(ranked.suspensionMessage ?? "온라인 대전 계정이 일시 정지되었습니다.");
+      return;
+    }
     const result = await online.joinRoom(code, ranked.profile.displayName, ranked.profile.rating, password);
     if (result === "password-required") {
       setPendingJoinCode(code);
@@ -891,7 +956,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   };
 
   const startOnlineBattle = () => {
-    if (!online.isHost || !online.allConnected) return;
+    if (!online.isHost || !online.allConnected || ranked.suspended) return;
     const freshBoard = createBoard(draftSettings.boardSize);
     void online.broadcast({
       kind: "start",
@@ -900,6 +965,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       boardSize: draftSettings.boardSize,
       activeSlot: 0,
       matchId: crypto.randomUUID(),
+      startedAt: Date.now(),
     });
   };
 
@@ -908,15 +974,27 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     if (settledMatchRef.current === onlineMatchId) return;
     settledMatchRef.current = onlineMatchId;
     const myTeam = teamForSlot(online.localSlot);
-    const opponents = online.players.filter((player) => teamForSlot(player.slot) !== myTeam);
+    const participants = onlineMatchPlayers.length ? onlineMatchPlayers : online.players;
+    const opponents = participants.filter((player) => teamForSlot(player.slot) !== myTeam);
     const opponentRating = opponents.length
       ? opponents.reduce((total, player) => total + player.rating, 0) / opponents.length
       : ranked.profile.rating;
-    const outcome = winner === 0 ? "draw" : winner === myTeam ? "win" : "loss";
-    void ranked.recordResult(onlineMatchId, outcome, opponentRating)
-      .then((delta) => setRatingDelta(delta))
+    const outcome: MatchOutcome | null = onlineEndReason === "void"
+      ? null
+      : winner === 0 ? "draw" : winner === myTeam ? "win" : "loss";
+    void ranked.recordMatch(onlineMatchId, outcome, opponentRating, {
+      startedAt: onlineStartedAt || Date.now() - elapsed * 1000,
+      durationSeconds: elapsed,
+      turns: Math.max(0, moveNumber - 1),
+      endReason: onlineEndReason,
+      opponentIds: opponents.map((player) => player.uid),
+    })
+      .then((result) => {
+        setRatingDelta(result?.ratingDelta ?? null);
+        if (result?.notice) setNotice(result.notice);
+      })
       .catch(() => setRatingDelta(null));
-  }, [gameOver, online.localSlot, online.players, onlineMatchId, ranked, settings.mode, winner]);
+  }, [elapsed, gameOver, moveNumber, online.localSlot, online.players, onlineEndReason, onlineMatchId, onlineMatchPlayers, onlineStartedAt, ranked, settings.mode, winner]);
 
   const submitAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -978,6 +1056,10 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
           <button onClick={() => setSoundOn((value) => !value)} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "◖))" : "◖×"}</button>
           <button onClick={() => setRulesOpen(true)} aria-label="게임 규칙 보기">?</button>
           <button className="mode-button" onClick={() => {
+            if (gameInProgress) {
+              setExitPromptOpen(true);
+              return;
+            }
             if (settings.mode === "online") void online.leave();
             setSetupOpen(true);
           }}><span>{gameLabel}</span><b>변경</b></button>
@@ -1263,7 +1345,8 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                     </>
                   )}
                 </div>
-                {!online.roomCode && ranked.profile && online.configured && (
+                {ranked.suspensionMessage && <p className="online-error" role="alert">{ranked.suspensionMessage}</p>}
+                {!online.roomCode && ranked.profile && online.configured && !ranked.suspended && (
                   <section className="room-browser" aria-labelledby="room-browser-title">
                     <header>
                       <div><b id="room-browser-title">참가 가능한 게임방</b></div>
@@ -1297,7 +1380,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                 ) : !online.roomCode ? (
                   <>
                     <div className="online-entry-actions">
-                      <button onClick={createOnlineRoom} disabled={online.status === "joining" || !ranked.profile}><b>새 방 만들기</b></button>
+                      <button onClick={createOnlineRoom} disabled={online.status === "joining" || !ranked.profile || ranked.suspended}><b>새 방 만들기</b></button>
                       <div>
                         <input
                           value={onlineJoinCode}
@@ -1306,7 +1389,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                           placeholder="방 코드 6자리"
                           aria-label="참가할 방 코드"
                         />
-                        <button onClick={joinOnlineRoom} disabled={online.status === "joining" || onlineJoinCode.length !== 6 || !ranked.profile}>참가</button>
+                        <button onClick={joinOnlineRoom} disabled={online.status === "joining" || onlineJoinCode.length !== 6 || !ranked.profile || ranked.suspended}>참가</button>
                       </div>
                     </div>
                   </>
@@ -1330,7 +1413,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                     </div>
                     <p className="direct-only-note">TURN 없이 직접 연결만 사용합니다. 연결되지 않으면 다른 네트워크에서 다시 참가해주세요.</p>
                     {online.isHost ? (
-                      <button className="online-start" onClick={startOnlineBattle} disabled={!online.allConnected}>{online.matchSize}명 모두 연결되면 대전 시작</button>
+                      <button className="online-start" onClick={startOnlineBattle} disabled={!online.allConnected || ranked.suspended}>{ranked.suspended ? "계정 정지 중" : `${online.matchSize}명 모두 연결되면 대전 시작`}</button>
                     ) : (
                       <div className="online-waiting">방장이 대전을 시작하기를 기다리고 있어요</div>
                     )}
@@ -1515,16 +1598,17 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
           <section className={`result-card ${winner === 2 ? "coral-win" : ""}`}>
             <span className="result-kicker">게임 끝</span>
             {winner !== 0 ? <Germ player={winner} /> : <div className="draw-symbol">＝</div>}
-            <h2>{winner === 0 ? "무승부" : `${winner === 1 ? "파란" : "빨간"} 팀 승리`}</h2>
+            <h2>{onlineEndReason === "void" ? "기록 없는 종료" : winner === 0 ? "무승부" : `${winner === 1 ? "파란" : "빨간"} 팀 승리`}</h2>
             <p>{scores[0]} <i>:</i> {scores[1]}</p>
-            <small>{moveNumber - 1}번 움직임 · {formatTime(elapsed)}</small>
-            {settings.mode === "online" && ranked.profile && (
+            <small>{moveNumber - 1}턴 · {formatTime(elapsed)}{onlineEndReason === "forfeit" ? " · 상대 팀 이탈" : onlineEndReason === "void" ? " · 3턴 이하 이탈" : ""}</small>
+            {settings.mode === "online" && ranked.profile && onlineEndReason !== "void" && (
               <div className={`rank-result ${ratingDelta !== null && ratingDelta < 0 ? "down" : "up"}`}>
                 <span>{ratingTier(ranked.profile.rating)}</span>
                 <b>포인트 {ranked.profile.rating}</b>
                 <em>{ratingDelta === null ? "정산 중" : ratingDelta > 0 ? `+${ratingDelta}` : ratingDelta}</em>
               </div>
             )}
+            {ranked.suspensionMessage && <div className="account-feedback" role="alert">{ranked.suspensionMessage}</div>}
             <div>
               <button onClick={() => {
                 if (settings.mode !== "online") startGame(settings);

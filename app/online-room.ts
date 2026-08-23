@@ -62,6 +62,7 @@ export type OnlineGameMessage =
       boardSize: BoardSize;
       activeSlot: number;
       matchId: string;
+      startedAt: number;
     }
   | {
       kind: "move-request";
@@ -80,6 +81,11 @@ export type OnlineGameMessage =
       useBomb: boolean;
       nextSlot: number;
       result: OnlineMoveResult;
+    }
+  | {
+      kind: "player-left";
+      uid: string;
+      slot: number;
     };
 
 type RoomRecord = {
@@ -189,6 +195,9 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const hostHeartbeatTimer = useRef<number | null>(null);
   const onMessageRef = useRef(onMessage);
   const leavingRef = useRef(false);
+  const previousPlayersRef = useRef(new Map<string, number>());
+  const roomPlayingRef = useRef(false);
+  const departureReportedRef = useRef(false);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -249,6 +258,11 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     channel.onmessage = (event) => {
       try {
         const message = JSON.parse(String(event.data)) as OnlineGameMessage;
+        if (message.kind === "player-left") return;
+        if (message.kind === "start" && peerUid === hostUidRef.current) {
+          roomPlayingRef.current = true;
+          departureReportedRef.current = false;
+        }
         onMessageRef.current(message, peerUid);
       } catch {
         setError("받은 게임 데이터를 해석할 수 없습니다.");
@@ -334,6 +348,13 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       const room = snapshot.val() as RoomRecord | null;
       if (!room) {
         if (!leavingRef.current) {
+          if (roomPlayingRef.current && !departureReportedRef.current) {
+            const host = [...previousPlayersRef.current.entries()].find(([, slot]) => slot === 0);
+            if (host) {
+              departureReportedRef.current = true;
+              onMessageRef.current({ kind: "player-left", uid: host[0], slot: host[1] }, host[0]);
+            }
+          }
           setStatus("disconnected");
           setError("방이 종료되었거나 호스트 연결이 끊어졌습니다.");
         }
@@ -348,6 +369,16 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
           connected: playerUid === uid || dataChannels.current.get(playerUid)?.readyState === "open",
         }))
         .sort((left, right) => left.slot - right.slot);
+      const nextPlayerSlots = new Map(nextPlayers.map((player) => [player.uid, player.slot]));
+      if (roomPlayingRef.current && !departureReportedRef.current) {
+        const departed = [...previousPlayersRef.current.entries()].find(([playerUid]) => !nextPlayerSlots.has(playerUid));
+        if (departed) {
+          departureReportedRef.current = true;
+          onMessageRef.current({ kind: "player-left", uid: departed[0], slot: departed[1] }, departed[0]);
+        }
+      }
+      previousPlayersRef.current = nextPlayerSlots;
+      roomPlayingRef.current = room.status === "playing";
       setPlayers(nextPlayers);
       setRoomTitle(cleanRoomTitle(room.title ?? "") || `${cleanName(nextPlayers[0]?.name ?? "방장")}의 게임방`);
       setRoomBoardSize(room.boardSize ?? 7);
@@ -380,6 +411,9 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     peerConnections.current.clear();
     pendingCandidates.current.clear();
     offeredPeers.current.clear();
+    previousPlayersRef.current.clear();
+    roomPlayingRef.current = false;
+    departureReportedRef.current = false;
     const database = databaseRef.current;
     const code = roomCodeRef.current;
     const uid = localUidRef.current;
@@ -606,6 +640,8 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       if (database && roomCodeRef.current) {
         await set(ref(database, `rooms/${roomCodeRef.current}/status`), "playing");
       }
+      roomPlayingRef.current = true;
+      departureReportedRef.current = false;
       setStatus("playing");
     }
     return true;

@@ -21,6 +21,22 @@ import {
 import { firebaseConfig, getFirebaseClient } from "./firebase-client";
 
 export type MatchOutcome = "win" | "loss" | "draw";
+export type MatchEndReason = "completed" | "forfeit" | "void";
+
+export type MatchDetails = {
+  startedAt: number;
+  durationSeconds: number;
+  turns: number;
+  endReason: MatchEndReason;
+  opponentIds: string[];
+};
+
+type MatchRecord = MatchDetails & {
+  outcome: MatchOutcome | "void";
+  endedAt: number;
+  suspicious?: boolean;
+  suspiciousReasons?: string[];
+};
 
 export type RankedProfile = {
   uid: string;
@@ -31,13 +47,24 @@ export type RankedProfile = {
   draws: number;
   games: number;
   updatedAt?: number;
+  suspiciousWinStreak: number;
+  fairPlayWarnings: number;
+  fairPlayMessage?: string;
+  suspendedUntil?: number;
 };
 
-type PrivateRankedRecord = Omit<RankedProfile, "uid"> & {
+type PrivateRankedRecord = Omit<RankedProfile, "uid" | "fairPlayMessage" | "suspendedUntil"> & {
+  fairPlayMessage?: string | null;
+  suspendedUntil?: number | null;
   processedMatches?: Record<string, boolean>;
+  matchHistory?: Record<string, MatchRecord>;
 };
 
 export const INITIAL_RATING = 1000;
+export const FAIR_PLAY_WARNING_STREAK = 2;
+export const FAIR_PLAY_SUSPENSION_STREAK = 4;
+export const FAIR_PLAY_SUSPENSION_MS = 24 * 60 * 60 * 1000;
+const MAX_MATCH_HISTORY = 50;
 
 export function ratingTier(rating: number) {
   if (rating >= 1800) return "그랜드마스터";
@@ -68,7 +95,17 @@ function cleanDisplayName(value: string) {
 }
 
 function emptyProfile(uid: string, displayName: string): RankedProfile {
-  return { uid, displayName, rating: INITIAL_RATING, wins: 0, losses: 0, draws: 0, games: 0 };
+  return {
+    uid,
+    displayName,
+    rating: INITIAL_RATING,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    games: 0,
+    suspiciousWinStreak: 0,
+    fairPlayWarnings: 0,
+  };
 }
 
 function normalizeProfile(uid: string, value: Partial<PrivateRankedRecord> | null, fallbackName: string): RankedProfile {
@@ -81,6 +118,10 @@ function normalizeProfile(uid: string, value: Partial<PrivateRankedRecord> | nul
     draws: Math.max(0, Math.round(value?.draws ?? 0)),
     games: Math.max(0, Math.round(value?.games ?? 0)),
     updatedAt: value?.updatedAt,
+    suspiciousWinStreak: Math.max(0, Math.round(value?.suspiciousWinStreak ?? 0)),
+    fairPlayWarnings: Math.max(0, Math.round(value?.fairPlayWarnings ?? 0)),
+    fairPlayMessage: value?.fairPlayMessage ?? undefined,
+    suspendedUntil: value?.suspendedUntil ?? undefined,
   };
 }
 
@@ -94,6 +135,37 @@ function publicProfile(profile: RankedProfile) {
     games: profile.games,
     updatedAt: serverTimestamp(),
   };
+}
+
+function sameOpponentSet(left: string[], right: string[]) {
+  return [...left].sort().join("|") === [...right].sort().join("|");
+}
+
+export function analyzeSuspiciousWin(previous: MatchRecord[], record: MatchRecord) {
+  if (record.outcome !== "win" || record.endReason !== "forfeit") return [] as string[];
+  const recent = [...previous].sort((left, right) => right.endedAt - left.endedAt).slice(0, 8);
+  const reasons: string[] = [];
+  if (record.turns <= 8 && record.durationSeconds <= 90) reasons.push("지나치게 짧은 이탈 승리");
+  const repeatedOpponents = recent.filter((item) =>
+    item.outcome === "win"
+    && item.endReason === "forfeit"
+    && record.endedAt - item.endedAt <= 24 * 60 * 60 * 1000
+    && sameOpponentSet(item.opponentIds, record.opponentIds),
+  ).length;
+  if (repeatedOpponents >= 2) reasons.push("같은 상대의 반복 이탈");
+  const consecutiveFastForfeits = recent.slice(0, 2).every((item) =>
+    item.outcome === "win" && item.endReason === "forfeit" && item.durationSeconds <= 120,
+  );
+  if (recent.length >= 2 && consecutiveFastForfeits) reasons.push("짧은 이탈 승리 연속 발생");
+  return reasons.length >= 2 ? reasons : [];
+}
+
+function trimMatchRecords(records: Record<string, MatchRecord>) {
+  return Object.fromEntries(
+    Object.entries(records)
+      .sort(([, left], [, right]) => right.endedAt - left.endedAt)
+      .slice(0, MAX_MATCH_HISTORY),
+  );
 }
 
 function authErrorMessage(reason: unknown) {
@@ -254,7 +326,12 @@ export function useRankedAccount() {
     }
   }, [profile, user]);
 
-  const recordResult = useCallback(async (matchId: string, outcome: MatchOutcome, opponentRating: number) => {
+  const recordMatch = useCallback(async (
+    matchId: string,
+    outcome: MatchOutcome | null,
+    opponentRating: number,
+    details: MatchDetails,
+  ) => {
     const currentUser = user;
     if (!currentUser || currentUser.isAnonymous || !profile) return null;
     const { database } = await getFirebaseClient();
@@ -263,25 +340,64 @@ export function useRankedAccount() {
       const previous = current as PrivateRankedRecord | null;
       if (previous?.processedMatches?.[matchId]) return undefined;
       const base = normalizeProfile(currentUser.uid, previous, currentUser.displayName ?? profile.displayName);
+      const endedAt = Date.now();
+      const matchRecord: MatchRecord = {
+        ...details,
+        durationSeconds: Math.max(0, Math.round(details.durationSeconds)),
+        turns: Math.max(0, Math.round(details.turns)),
+        opponentIds: [...new Set(details.opponentIds)].slice(0, 2),
+        outcome: outcome ?? "void",
+        endedAt,
+      };
+      const previousHistory = previous?.matchHistory ?? {};
+      const suspiciousReasons = analyzeSuspiciousWin(Object.values(previousHistory), matchRecord);
+      if (suspiciousReasons.length) {
+        matchRecord.suspicious = true;
+        matchRecord.suspiciousReasons = suspiciousReasons;
+      }
+      const suspiciousWinStreak = suspiciousReasons.length
+        ? base.suspiciousWinStreak + 1
+        : outcome && details.endReason === "completed" ? 0 : base.suspiciousWinStreak;
+      const shouldWarn = suspiciousWinStreak >= FAIR_PLAY_WARNING_STREAK;
+      const shouldSuspend = suspiciousWinStreak >= FAIR_PLAY_SUSPENSION_STREAK;
+      const fairPlayWarnings = base.fairPlayWarnings + (shouldWarn ? 1 : 0);
+      const fairPlayMessage = shouldSuspend
+        ? "비정상적인 이탈 승리가 반복되어 온라인 대전 계정이 24시간 정지되었습니다."
+        : shouldWarn
+          ? `비정상적인 이탈 승리가 ${suspiciousWinStreak}회 연속 감지되었습니다. 반복되면 계정이 정지됩니다.`
+          : undefined;
       const actual = outcome === "win" ? 1 : outcome === "draw" ? 0.5 : 0;
       const expected = 1 / (1 + 10 ** ((opponentRating - base.rating) / 400));
-      const delta = Math.round(32 * (actual - expected));
+      const delta = outcome ? Math.round(32 * (actual - expected)) : 0;
+      const matchHistory = trimMatchRecords({ ...previousHistory, [matchId]: matchRecord });
+      const processedMatches = Object.fromEntries(Object.keys(matchHistory).map((id) => [id, true]));
       return {
+        ...(previous ?? {}),
         displayName: base.displayName,
         rating: Math.max(0, base.rating + delta),
         wins: base.wins + (outcome === "win" ? 1 : 0),
         losses: base.losses + (outcome === "loss" ? 1 : 0),
         draws: base.draws + (outcome === "draw" ? 1 : 0),
-        games: base.games + 1,
+        games: base.games + (outcome ? 1 : 0),
         updatedAt: serverTimestamp(),
-        processedMatches: { ...(previous?.processedMatches ?? {}), [matchId]: true },
+        suspiciousWinStreak,
+        fairPlayWarnings,
+        fairPlayMessage: fairPlayMessage ?? null,
+        suspendedUntil: shouldSuspend ? endedAt + FAIR_PLAY_SUSPENSION_MS : (base.suspendedUntil ?? null),
+        processedMatches,
+        matchHistory,
       } satisfies PrivateRankedRecord;
     }, { applyLocally: false });
     if (!result.committed) return null;
     const updated = normalizeProfile(currentUser.uid, result.snapshot.val() as PrivateRankedRecord, profile.displayName);
     await set(ref(database, `rankings/${currentUser.uid}`), publicProfile(updated));
-    return updated.rating - profile.rating;
+    return { ratingDelta: updated.rating - profile.rating, notice: updated.fairPlayMessage ?? null };
   }, [profile, user]);
 
-  return { configured, user, profile, leaderboard, ready, busy, error, createAccount, login, logout, updateDisplayName, recordResult };
+  const suspended = Boolean(profile?.suspendedUntil && profile.suspendedUntil > Date.now());
+  const suspensionMessage = suspended
+    ? `${profile?.fairPlayMessage ?? "온라인 대전 계정이 일시 정지되었습니다."} 정지 해제: ${new Date(profile?.suspendedUntil ?? 0).toLocaleString("ko-KR")}`
+    : profile?.fairPlayMessage;
+
+  return { configured, user, profile, leaderboard, ready, busy, error, suspended, suspensionMessage, createAccount, login, logout, updateDisplayName, recordMatch };
 }

@@ -81,3 +81,27 @@ test("free battle exposes room creation, joining, and four connected slots", asy
   assert.match(source, /방 비밀번호 입력/);
   assert.match(source, /room\.hasPassword/);
 });
+
+test("online departures use turn-aware forfeits and persist fair-play timing", async () => {
+  const roomSource = await readFile(new URL("../app/online-room.ts", import.meta.url), "utf8");
+  const battleSource = await readFile(new URL("../app/free-battle.tsx", import.meta.url), "utf8");
+  const accountSource = await readFile(new URL("../app/ranked-account.ts", import.meta.url), "utf8");
+  const rules = await readFile(new URL("../firebase/database.rules.json", import.meta.url), "utf8");
+  assert.match(roomSource, /kind: "player-left"/);
+  assert.match(roomSource, /if \(message\.kind === "player-left"\) return/);
+  assert.match(roomSource, /departureReportedRef/);
+  assert.match(roomSource, /previousPlayersRef/);
+  assert.match(battleSource, /completedTurns <= 3/);
+  assert.match(battleSource, /setOnlineEndReason\("void"\)/);
+  assert.match(battleSource, /setOnlineEndReason\("forfeit"\)/);
+  assert.match(battleSource, /recordMatch\(onlineMatchId/);
+  assert.match(battleSource, /durationSeconds: elapsed/);
+  assert.match(accountSource, /analyzeSuspiciousWin/);
+  assert.match(accountSource, /FAIR_PLAY_WARNING_STREAK = 2/);
+  assert.match(accountSource, /FAIR_PLAY_SUSPENSION_STREAK = 4/);
+  assert.match(accountSource, /24시간 정지/);
+  assert.match(rules, /"matchHistory"/);
+  assert.match(rules, /"suspendedUntil"/);
+  assert.match(rules, /auth\.uid == \$uid/);
+  assert.match(rules, /data\.child\('hostId'\)\.val\(\) == auth\.uid/);
+});
