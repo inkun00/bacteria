@@ -33,12 +33,14 @@ export type OnlineMatchSize = 2 | 4;
 
 export type OnlineRoomSummary = {
   code: string;
+  title: string;
   hostName: string;
   hostRating: number;
   boardSize: BoardSize;
   matchSize: OnlineMatchSize;
   playerCount: number;
   createdAt: number;
+  hasPassword: boolean;
 };
 
 export type OnlineMoveResult = {
@@ -82,6 +84,9 @@ export type OnlineGameMessage =
 
 type RoomRecord = {
   hostId?: string;
+  title?: string;
+  passwordHash?: string;
+  hostLastSeen?: number;
   boardSize?: BoardSize;
   matchSize?: OnlineMatchSize;
   status?: "waiting" | "playing";
@@ -101,6 +106,8 @@ type OnlineRoomStatus = "idle" | "joining" | "waiting" | "connecting" | "ready" 
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ROOM_CODE_LENGTH = 6;
 const DEFAULT_MATCH_SIZE: OnlineMatchSize = 4;
+const ROOM_HEARTBEAT_INTERVAL_MS = 15_000;
+const ROOM_STALE_AFTER_MS = 60_000;
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
 ];
@@ -117,6 +124,17 @@ function cleanName(value: string) {
 
 function cleanCode(value: string) {
   return value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, ROOM_CODE_LENGTH);
+}
+
+function cleanRoomTitle(value: string) {
+  return value.trim().replace(/\s+/g, " ").slice(0, 30);
+}
+
+async function hashRoomPassword(code: string, password: string) {
+  if (!password) return "";
+  const bytes = new TextEncoder().encode(`${code}:${password}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function waitForUser(auth: Auth) {
@@ -146,6 +164,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const [status, setStatus] = useState<OnlineRoomStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
+  const [roomTitle, setRoomTitle] = useState("");
   const [players, setPlayers] = useState<OnlinePlayer[]>([]);
   const [localUid, setLocalUid] = useState("");
   const [hostUid, setHostUid] = useState("");
@@ -167,12 +186,25 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const offeredPeers = useRef(new Set<string>());
   const unsubscribes = useRef<Unsubscribe[]>([]);
   const roomsUnsubscribe = useRef<Unsubscribe | null>(null);
+  const hostHeartbeatTimer = useRef<number | null>(null);
   const onMessageRef = useRef(onMessage);
   const leavingRef = useRef(false);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
   }, [onMessage]);
+
+  const stopHostHeartbeat = useCallback(() => {
+    if (hostHeartbeatTimer.current !== null) window.clearInterval(hostHeartbeatTimer.current);
+    hostHeartbeatTimer.current = null;
+  }, []);
+
+  const startHostHeartbeat = useCallback((database: Database, code: string) => {
+    stopHostHeartbeat();
+    const updateHeartbeat = () => void set(ref(database, `rooms/${code}/hostLastSeen`), serverTimestamp()).catch(() => undefined);
+    updateHeartbeat();
+    hostHeartbeatTimer.current = window.setInterval(updateHeartbeat, ROOM_HEARTBEAT_INTERVAL_MS);
+  }, [stopHostHeartbeat]);
 
   const refreshPlayerConnections = useCallback(() => {
     setPlayers((current) => current.map((player) => ({
@@ -317,6 +349,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
         }))
         .sort((left, right) => left.slot - right.slot);
       setPlayers(nextPlayers);
+      setRoomTitle(cleanRoomTitle(room.title ?? "") || `${cleanName(nextPlayers[0]?.name ?? "방장")}의 게임방`);
       setRoomBoardSize(room.boardSize ?? 7);
       setMatchSize(room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE);
       hostUidRef.current = room.hostId ?? "";
@@ -338,6 +371,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
 
   const leave = useCallback(async () => {
     leavingRef.current = true;
+    stopHostHeartbeat();
     unsubscribes.current.forEach((unsubscribe) => unsubscribe());
     unsubscribes.current = [];
     dataChannels.current.forEach((channel) => channel.close());
@@ -362,15 +396,22 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     localSlotRef.current = null;
     isHostRef.current = false;
     setRoomCode("");
+    setRoomTitle("");
     setPlayers([]);
     setHostUid("");
     setLocalSlot(null);
     setStatus("idle");
     setError(null);
     leavingRef.current = false;
-  }, []);
+  }, [stopHostHeartbeat]);
 
-  const createRoom = useCallback(async (name: string, boardSize: BoardSize, requestedMatchSize: OnlineMatchSize, rating = 1000) => {
+  const createRoom = useCallback(async (name: string, boardSize: BoardSize, requestedMatchSize: OnlineMatchSize, rating = 1000, title = "", password = "") => {
+    const cleanedTitle = cleanRoomTitle(title);
+    if (!cleanedTitle) {
+      setStatus("error");
+      setError("방 제목을 입력해주세요.");
+      return false;
+    }
     await leave();
     setStatus("joining");
     setError(null);
@@ -379,8 +420,12 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       let code = "";
       for (let attempt = 0; attempt < 8; attempt += 1) {
         const candidate = createRoomCode();
+        const passwordHash = await hashRoomPassword(candidate, password);
         const result = await runTransaction(ref(database, `rooms/${candidate}`), (current) => current === null ? {
           hostId: uid,
+          title: cleanedTitle,
+          ...(passwordHash ? { passwordHash } : {}),
+          hostLastSeen: serverTimestamp(),
           boardSize,
           matchSize: requestedMatchSize,
           status: "waiting",
@@ -394,25 +439,29 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
         }
       }
       if (!code) throw new Error("방 코드를 만들지 못했습니다. 다시 시도해주세요.");
+      await onDisconnect(ref(database, `rooms/${code}`)).remove();
       roomCodeRef.current = code;
       hostUidRef.current = uid;
       localSlotRef.current = 0;
       isHostRef.current = true;
       setRoomCode(code);
+      setRoomTitle(cleanedTitle);
       setHostUid(uid);
       setLocalSlot(0);
       setRoomBoardSize(boardSize);
       setMatchSize(requestedMatchSize);
       subscribeToRoom(database, code, uid);
-      await onDisconnect(ref(database, `rooms/${code}`)).remove();
+      startHostHeartbeat(database, code);
       setStatus("waiting");
+      return true;
     } catch (reason) {
       setStatus("error");
       setError(reason instanceof Error ? reason.message : "방을 만들지 못했습니다.");
+      return false;
     }
-  }, [getServices, leave, subscribeToRoom]);
+  }, [getServices, leave, startHostHeartbeat, subscribeToRoom]);
 
-  const joinRoom = useCallback(async (rawCode: string, name: string, rating = 1000) => {
+  const joinRoom = useCallback(async (rawCode: string, name: string, rating = 1000, password = "") => {
     await leave();
     setStatus("joining");
     setError(null);
@@ -424,6 +473,14 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       const roomReference = ref(database, `rooms/${code}`);
       const initialRoom = (await get(roomReference)).val() as RoomRecord | null;
       if (!initialRoom || initialRoom.status !== "waiting") throw new Error("방을 찾을 수 없거나 이미 게임 중입니다.");
+      if (initialRoom.passwordHash) {
+        if (!password) {
+          setStatus("idle");
+          return "password-required" as const;
+        }
+        const passwordHash = await hashRoomPassword(code, password);
+        if (passwordHash !== initialRoom.passwordHash) throw new Error("방 비밀번호가 올바르지 않습니다.");
+      }
       const roomMatchSize = initialRoom.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
       let slot: number | undefined;
       for (let candidate = 1; candidate < roomMatchSize; candidate += 1) {
@@ -450,6 +507,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       localSlotRef.current = slot;
       isHostRef.current = false;
       setRoomCode(code);
+      setRoomTitle(cleanRoomTitle(room.title ?? "") || `${cleanName(room.players?.[room.hostId ?? ""]?.name ?? "방장")}의 게임방`);
       setHostUid(room.hostId ?? "");
       setLocalSlot(slot);
       setRoomBoardSize(room.boardSize ?? 7);
@@ -457,6 +515,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       subscribeToRoom(database, code, uid);
       reservation = null;
       setStatus("connecting");
+      return "joined" as const;
     } catch (reason) {
       if (reservation) {
         await Promise.all([
@@ -466,6 +525,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       }
       setStatus("error");
       setError(reason instanceof Error ? reason.message : "방에 참가하지 못했습니다.");
+      return "failed" as const;
     }
   }, [getServices, leave, subscribeToRoom]);
 
@@ -483,21 +543,28 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
       roomsUnsubscribe.current?.();
       roomsUnsubscribe.current = onValue(roomsQuery, (snapshot) => {
         const value = snapshot.val() as Record<string, RoomRecord> | null;
+        const staleRoomCodes: string[] = [];
         const rooms = Object.entries(value ?? {}).flatMap(([code, room]) => {
           const roomMatchSize: OnlineMatchSize = room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
           const roomPlayers = Object.entries(room.players ?? {});
           const host = room.hostId ? room.players?.[room.hostId] : roomPlayers.find(([, player]) => player.slot === 0)?.[1];
-          if (room.status !== "waiting" || roomPlayers.length >= roomMatchSize || !host) return [];
+          const lastSeen = Number(room.hostLastSeen ?? room.createdAt ?? 0);
+          const isStale = !Number.isFinite(lastSeen) || lastSeen <= 0 || Date.now() - lastSeen > ROOM_STALE_AFTER_MS;
+          if (isStale) staleRoomCodes.push(code);
+          if (room.status !== "waiting" || roomPlayers.length >= roomMatchSize || !host || isStale) return [];
           return [{
             code,
+            title: cleanRoomTitle(room.title ?? "") || `${cleanName(host.name)}의 게임방`,
             hostName: cleanName(host.name),
             hostRating: Number.isFinite(host.rating) ? Math.max(0, Math.round(host.rating ?? 1000)) : 1000,
             boardSize: room.boardSize === 9 || room.boardSize === 11 ? room.boardSize : 7,
             matchSize: roomMatchSize,
             playerCount: roomPlayers.length,
             createdAt: Number.isFinite(room.createdAt) ? room.createdAt ?? 0 : 0,
+            hasPassword: Boolean(room.passwordHash),
           } satisfies OnlineRoomSummary];
         });
+        staleRoomCodes.forEach((code) => void remove(ref(database, `rooms/${code}`)).catch(() => undefined));
         rooms.sort((left, right) => right.createdAt - left.createdAt || left.code.localeCompare(right.code));
         setAvailableRooms(rooms);
         setRoomsRefreshedAt(Date.now());
@@ -545,6 +612,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   }, []);
 
   useEffect(() => () => {
+    stopHostHeartbeat();
     roomsUnsubscribe.current?.();
     unsubscribes.current.forEach((unsubscribe) => unsubscribe());
     dataChannels.current.forEach((channel) => channel.close());
@@ -560,13 +628,14 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     }
     void remove(ref(database, `rooms/${code}/players/${uid}`));
     if (slot !== null) void remove(ref(database, `rooms/${code}/slotOwners/slot${slot}`));
-  }, []);
+  }, [stopHostHeartbeat]);
 
   return {
     configured: Boolean(config) && typeof RTCPeerConnection !== "undefined",
     status,
     error,
     roomCode,
+    roomTitle,
     roomBoardSize,
     matchSize,
     players,

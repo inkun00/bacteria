@@ -22,6 +22,12 @@ test("online 2v2 uses Firebase signaling and STUN-only WebRTC", async () => {
   assert.match(source, /roomsUnsubscribe\.current = onValue\(roomsQuery/);
   assert.match(source, /roomPlayers\.length >= roomMatchSize \|\| !host/);
   assert.match(source, /if \(isHostRef\.current\) \{\s*void remove\(ref\(database, `rooms\/\$\{code\}`\)\)/);
+  assert.match(source, /ROOM_HEARTBEAT_INTERVAL_MS = 15_000/);
+  assert.match(source, /ROOM_STALE_AFTER_MS = 60_000/);
+  assert.match(source, /hostLastSeen: serverTimestamp\(\)/);
+  assert.match(source, /staleRoomCodes\.forEach/);
+  assert.match(source, /crypto\.subtle\.digest\("SHA-256"/);
+  assert.match(source, /passwordHash !== initialRoom\.passwordHash/);
 });
 
 test("ranked accounts persist Elo MMR and expose a top-50 leaderboard", async () => {
@@ -53,4 +59,9 @@ test("free battle exposes room creation, joining, and four connected slots", asy
   assert.match(source, /online\.availableRooms\.map/);
   assert.match(source, /draftSettings\.mode === "online" \|\| !openOnlineRoomCode/);
   assert.match(source, /void leaveOnlineRoom\(\)/);
+  assert.match(source, /새 대전방 만들기/);
+  assert.match(source, /방 제목 <em>필수<\/em>/);
+  assert.match(source, /비밀번호 사용/);
+  assert.match(source, /방 비밀번호 입력/);
+  assert.match(source, /room\.hasPassword/);
 });

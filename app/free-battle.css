@@ -373,15 +373,17 @@
 .free-battle .room-browser > header button:disabled { opacity: .48; cursor: wait; }
 .free-battle .room-browser > header button span { font: 900 15px var(--font-geist-mono),monospace; }
 .free-battle .room-list { display: grid; gap: 7px; max-height: 250px; overflow-y: auto; padding-right: 2px; }
-.free-battle .room-list article { display: grid; grid-template-columns: 82px minmax(105px,1.4fr) minmax(82px,1fr) 58px; align-items: center; gap: 10px; min-height: 62px; padding: 8px 9px; border: 1px solid rgba(112,158,143,.18); border-radius: 8px; background: rgba(90,145,126,.035); }
+.free-battle .room-list article { display: grid; grid-template-columns: 72px minmax(150px,1.8fr) minmax(82px,.8fr) 58px; align-items: center; gap: 10px; min-height: 68px; padding: 8px 9px; border: 1px solid rgba(112,158,143,.18); border-radius: 8px; background: rgba(90,145,126,.035); }
 .free-battle .room-list article.duel { border-left: 3px solid rgba(53,234,211,.65); }
 .free-battle .room-list article.team { border-left: 3px solid rgba(255,196,87,.65); }
-.free-battle .room-mode, .free-battle .room-host, .free-battle .room-occupancy { min-width: 0; display: grid; gap: 2px; }
+.free-battle .room-mode, .free-battle .room-details, .free-battle .room-occupancy { min-width: 0; display: grid; gap: 2px; }
 .free-battle .room-mode strong { color: var(--cyan); font: 900 13px var(--font-geist-mono),monospace; }
 .free-battle .room-list article.team .room-mode strong { color: #ffd374; }
 .free-battle .room-list article small { color: #63867a; font-size: 7px; }
 .free-battle .room-list article b { overflow: hidden; color: #e7fff6; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .free-battle .room-list article span { color: #78998e; font-size: 7px; }
+.free-battle .room-details b { font-size: 10px; }
+.free-battle .room-details small { color: #8cb7a9; }
 .free-battle .room-list article > button { height: 36px; border: 0; border-radius: 7px; color: #05231c; background: var(--cyan); font-size: 9px; font-weight: 900; cursor: pointer; }
 .free-battle .room-list article > button:disabled { opacity: .42; cursor: wait; }
 .free-battle .room-browser-state { min-height: 66px; display: grid; place-items: center; align-content: center; gap: 4px; border: 1px dashed rgba(112,158,143,.18); border-radius: 8px; color: #6e9085; font-size: 9px; text-align: center; }
@@ -409,6 +411,9 @@
 .free-battle .online-entry-actions button:disabled, .free-battle .online-start:disabled { opacity: .38; cursor: not-allowed; }
 .free-battle .room-code-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 9px; background: rgba(53,234,211,.07); }
 .free-battle .room-code-card span { color: #789a8f; font-size: 9px; }
+.free-battle .room-code-card span b, .free-battle .room-code-card span small { display: block; }
+.free-battle .room-code-card span b { max-width: 240px; overflow: hidden; color: #eafff8; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.free-battle .room-code-card span small { margin-top: 3px; color: #789a8f; font-size: 7px; }
 .free-battle .room-code-card strong { color: var(--cyan); font: 900 24px var(--font-geist-mono), monospace; letter-spacing: .18em; }
 .free-battle .room-code-card button { height: 32px; padding: 0 12px; border: 1px solid rgba(53,234,211,.3); border-radius: 6px; color: var(--cyan); background: transparent; cursor: pointer; }
 .free-battle .online-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 10px; }
@@ -441,6 +446,16 @@
 .free-battle .account-modal label span { color: #8daca2; font-size: 9px; font-weight: 700; }
 .free-battle .account-modal input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid rgba(116,177,157,.3); border-radius: 8px; outline: 0; color: #effff9; background: rgba(3,20,16,.8); font-size: 12px; }
 .free-battle .account-modal input:focus { border-color: rgba(53,234,211,.65); box-shadow: 0 0 0 3px rgba(53,234,211,.08); }
+.free-battle .room-create-modal, .free-battle .room-password-modal { border-color: rgba(53,234,211,.34); box-shadow: 0 35px 100px rgba(0,0,0,.7),0 0 60px rgba(53,234,211,.08); }
+.free-battle .room-create-modal > small, .free-battle .room-password-modal > small { color: var(--cyan); }
+.free-battle .room-create-modal label span em { margin-left: 5px; color: #ffaf77; font-size: 7px; font-style: normal; }
+.free-battle .room-password-toggle { grid-template-columns: 20px 1fr; align-items: center; padding: 11px; border: 1px solid rgba(112,158,143,.2); border-radius: 9px; background: rgba(2,17,14,.5); cursor: pointer; }
+.free-battle .account-modal .room-password-toggle input { width: 17px; height: 17px; padding: 0; accent-color: var(--cyan); }
+.free-battle .room-password-toggle > span { display: grid; gap: 3px; }
+.free-battle .room-password-toggle b { color: #dffaf1; font-size: 10px; }
+.free-battle .room-password-toggle small { color: #6f9186; font-size: 8px; font-weight: 400; }
+.free-battle .room-modal-summary { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+.free-battle .room-modal-summary span { padding: 9px 6px; border: 1px solid rgba(53,234,211,.18); border-radius: 7px; color: #93b9ad; background: rgba(53,234,211,.04); font-size: 8px; text-align: center; }
 .free-battle .account-feedback { padding: 10px; border: 1px solid rgba(255,109,104,.3); border-radius: 7px; color: #ffaaa5; background: rgba(255,109,104,.06); font-size: 9px; text-align: center; }
 .free-battle .account-submit { height: 46px; margin-top: 4px; border: 0; border-radius: 8px; color: #04231c; background: linear-gradient(100deg,#35ead3,#8dffd8); font-size: 11px; font-weight: 900; cursor: pointer; }
 .free-battle .account-submit:disabled { opacity: .45; cursor: wait; }
@@ -616,7 +631,7 @@
   .free-battle .match-size-select > div { grid-column: 1 / -1; text-align: center; }
   .free-battle .rank-account-card { grid-template-columns: 42px 1fr; }
   .free-battle .rank-account-card > button { min-height: 38px; }
-  .free-battle .room-list article { grid-template-columns: 64px 1fr 54px; }
+  .free-battle .room-list article { grid-template-columns: 62px 1fr 54px; }
   .free-battle .room-occupancy { display: none; }
   .free-battle .ranking-row { grid-template-columns: 38px minmax(105px,1fr) 66px 58px; }
   .free-battle .ranking-row > small, .free-battle .ranking-row.heading > span:last-child { display: none; }

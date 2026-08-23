@@ -7,6 +7,7 @@ import {
   type OnlineGameMessage,
   type OnlineMatchSize,
   type OnlineMoveResult,
+  type OnlineRoomSummary,
 } from "./online-room";
 import {
   applyMove,
@@ -179,6 +180,13 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const [onlineName, setOnlineName] = useState("연구원");
   const [onlineJoinCode, setOnlineJoinCode] = useState("");
   const [onlineMatchSize, setOnlineMatchSize] = useState<OnlineMatchSize>(4);
+  const [roomCreateOpen, setRoomCreateOpen] = useState(false);
+  const [newRoomTitle, setNewRoomTitle] = useState("");
+  const [roomPasswordEnabled, setRoomPasswordEnabled] = useState(false);
+  const [newRoomPassword, setNewRoomPassword] = useState("");
+  const [roomPasswordOpen, setRoomPasswordOpen] = useState(false);
+  const [pendingJoinCode, setPendingJoinCode] = useState("");
+  const [joinRoomPassword, setJoinRoomPassword] = useState("");
   const [activeSlot, setActiveSlot] = useState(0);
   const [onlineMatchId, setOnlineMatchId] = useState("");
   const [accountOpen, setAccountOpen] = useState(false);
@@ -810,7 +818,41 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       setAccountFeedback("랭크 방을 만들려면 먼저 로그인해주세요.");
       return;
     }
-    void online.createRoom(ranked.profile.displayName, draftSettings.boardSize, onlineMatchSize, ranked.profile.rating);
+    setNewRoomTitle("");
+    setRoomPasswordEnabled(false);
+    setNewRoomPassword("");
+    setRoomCreateOpen(true);
+  };
+
+  const submitCreateOnlineRoom = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!ranked.profile || !newRoomTitle.trim()) return;
+    const password = roomPasswordEnabled ? newRoomPassword : "";
+    void online.createRoom(
+      ranked.profile.displayName,
+      draftSettings.boardSize,
+      onlineMatchSize,
+      ranked.profile.rating,
+      newRoomTitle,
+      password,
+    ).then((created) => {
+      if (!created) return;
+      setRoomCreateOpen(false);
+      setNewRoomPassword("");
+    });
+  };
+
+  const attemptJoinRoom = async (code: string, password = "") => {
+    if (!ranked.profile) return;
+    const result = await online.joinRoom(code, ranked.profile.displayName, ranked.profile.rating, password);
+    if (result === "password-required") {
+      setPendingJoinCode(code);
+      setJoinRoomPassword("");
+      setRoomPasswordOpen(true);
+    } else if (result === "joined") {
+      setRoomPasswordOpen(false);
+      setJoinRoomPassword("");
+    }
   };
 
   const joinOnlineRoom = () => {
@@ -819,13 +861,25 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
       setAccountFeedback("랭크 방에 참가하려면 먼저 로그인해주세요.");
       return;
     }
-    void online.joinRoom(onlineJoinCode, ranked.profile.displayName, ranked.profile.rating);
+    void attemptJoinRoom(onlineJoinCode);
   };
 
-  const joinListedRoom = (code: string) => {
+  const joinListedRoom = (room: OnlineRoomSummary) => {
     if (!ranked.profile) return;
-    setOnlineJoinCode(code);
-    void online.joinRoom(code, ranked.profile.displayName, ranked.profile.rating);
+    setOnlineJoinCode(room.code);
+    if (room.hasPassword) {
+      setPendingJoinCode(room.code);
+      setJoinRoomPassword("");
+      setRoomPasswordOpen(true);
+      return;
+    }
+    void attemptJoinRoom(room.code);
+  };
+
+  const submitRoomPassword = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!joinRoomPassword) return;
+    void attemptJoinRoom(pendingJoinCode, joinRoomPassword);
   };
 
   const startOnlineBattle = () => {
@@ -1200,9 +1254,9 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                         {online.availableRooms.map((room) => (
                           <article key={room.code} className={room.matchSize === 2 ? "duel" : "team"}>
                             <div className="room-mode"><strong>{room.matchSize === 2 ? "1 : 1" : "2 : 2"}</strong><small>{room.boardSize}×{room.boardSize} 보드</small></div>
-                            <div className="room-host"><small>방장</small><b>{room.hostName}</b><span>MMR {room.hostRating}</span></div>
+                            <div className="room-details"><small>{room.hasPassword ? "🔒 비밀번호 방" : "공개 방"}</small><b>{room.title}</b><span>방장 {room.hostName} · MMR {room.hostRating}</span></div>
                             <div className="room-occupancy"><small>참가 인원</small><b>{room.playerCount} / {room.matchSize}</b><span>{room.matchSize - room.playerCount}자리 남음</span></div>
-                            <button type="button" onClick={() => joinListedRoom(room.code)} disabled={online.status === "joining"}>참가</button>
+                            <button type="button" onClick={() => joinListedRoom(room)} disabled={online.status === "joining"}>참가</button>
                           </article>
                         ))}
                       </div>
@@ -1241,7 +1295,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                 ) : (
                   <>
                     <div className="room-code-card">
-                      <span>방 코드 · {online.matchSize === 2 ? "1:1" : "2:2"}</span><strong>{online.roomCode}</strong>
+                      <span><b>{online.roomTitle}</b><small>방 코드 · {online.matchSize === 2 ? "1:1" : "2:2"}</small></span><strong>{online.roomCode}</strong>
                       <button onClick={() => void navigator.clipboard?.writeText(online.roomCode)}>복사</button>
                     </div>
                     <div className="online-slots">
@@ -1320,6 +1374,40 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
               <label><span>비밀번호</span><input type="password" value={accountPassword} minLength={6} autoComplete={accountMode === "create" ? "new-password" : "current-password"} onChange={(event) => setAccountPassword(event.target.value)} placeholder="6자 이상" required /></label>
               {(accountFeedback || ranked.error) && <div className="account-feedback" role="alert">{accountFeedback || ranked.error}</div>}
               <button className="account-submit" type="submit" disabled={ranked.busy}>{ranked.busy ? "처리 중..." : accountMode === "create" ? "MMR 1000으로 시작하기" : "로그인"}</button>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {roomCreateOpen && (
+        <div className="account-modal-backdrop">
+          <section className="account-modal room-create-modal" role="dialog" aria-modal="true" aria-labelledby="room-create-title">
+            <button className="account-modal-close" type="button" onClick={() => setRoomCreateOpen(false)} aria-label="방 만들기 창 닫기">×</button>
+            <small>ONLINE BATTLE // CREATE ROOM</small>
+            <h2 id="room-create-title">새 대전방 만들기</h2>
+            <p>목록에서 알아보기 쉬운 방 제목을 입력하세요. 비밀번호는 원하는 경우에만 설정할 수 있습니다.</p>
+            <form onSubmit={submitCreateOnlineRoom}>
+              <label><span>방 제목 <em>필수</em></span><input value={newRoomTitle} maxLength={30} autoFocus onChange={(event) => setNewRoomTitle(event.target.value)} placeholder="예: 약수 고수만 오세요" required /></label>
+              <label className="room-password-toggle"><input type="checkbox" checked={roomPasswordEnabled} onChange={(event) => { setRoomPasswordEnabled(event.target.checked); if (!event.target.checked) setNewRoomPassword(""); }} /><span><b>비밀번호 사용</b><small>체크하면 비밀번호를 아는 사람만 참가할 수 있어요.</small></span></label>
+              {roomPasswordEnabled && <label><span>방 비밀번호</span><input type="password" value={newRoomPassword} minLength={4} maxLength={20} autoComplete="new-password" onChange={(event) => setNewRoomPassword(event.target.value)} placeholder="4~20자" required /></label>}
+              <div className="room-modal-summary"><span>{onlineMatchSize === 2 ? "1 : 1" : "2 : 2"}</span><span>{draftSettings.boardSize}×{draftSettings.boardSize} 보드</span><span>{roomPasswordEnabled ? "비공개" : "공개"}</span></div>
+              <button className="account-submit" type="submit" disabled={online.status === "joining" || !newRoomTitle.trim() || (roomPasswordEnabled && newRoomPassword.length < 4)}>{online.status === "joining" ? "방 만드는 중..." : "대전방 만들기"}</button>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {roomPasswordOpen && (
+        <div className="account-modal-backdrop">
+          <section className="account-modal room-password-modal" role="dialog" aria-modal="true" aria-labelledby="room-password-title">
+            <button className="account-modal-close" type="button" onClick={() => setRoomPasswordOpen(false)} aria-label="비밀번호 입력 창 닫기">×</button>
+            <small>PRIVATE ROOM // {pendingJoinCode}</small>
+            <h2 id="room-password-title">방 비밀번호 입력</h2>
+            <p>방장이 설정한 비밀번호를 입력해야 참가할 수 있습니다.</p>
+            <form onSubmit={submitRoomPassword}>
+              <label><span>비밀번호</span><input type="password" value={joinRoomPassword} maxLength={20} autoFocus autoComplete="current-password" onChange={(event) => setJoinRoomPassword(event.target.value)} placeholder="방 비밀번호" required /></label>
+              {online.error && <div className="account-feedback" role="alert">{online.error}</div>}
+              <button className="account-submit" type="submit" disabled={online.status === "joining" || !joinRoomPassword}>{online.status === "joining" ? "확인 중..." : "비밀번호 확인 후 참가"}</button>
             </form>
           </section>
         </div>
