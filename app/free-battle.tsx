@@ -1160,13 +1160,13 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
 
             <div className="mode-tabs">
               <button className={draftSettings.mode === "ai" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "ai" }))}>
-                <span className="tab-icon">⌁</span><span><b>컴퓨터와 하기</b><small>컴퓨터와 겨뤄요</small></span>
+                <span className="tab-icon" aria-hidden="true">💻</span><span><b>컴퓨터와 하기</b><small>컴퓨터와 겨뤄요</small></span>
               </button>
               <button className={draftSettings.mode === "local" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "local" }))}>
-                <span className="tab-icon">◎</span><span><b>친구와 하기</b><small>한 화면에서 둘이 해요</small></span>
+                <span className="tab-icon" aria-hidden="true">👥</span><span><b>친구와 하기</b><small>한 화면에서 둘이 해요</small></span>
               </button>
               <button className={draftSettings.mode === "online" ? "selected" : ""} onClick={() => setDraftSettings((value) => ({ ...value, mode: "online" }))}>
-                <span className="tab-icon">⌁</span><span><b>온라인 대전</b><small>1:1 또는 2:2 방을 만들어요</small></span>
+                <span className="tab-icon" aria-hidden="true">🌐</span><span><b>온라인 대전</b><small>1:1 또는 2:2 방을 만들어요</small></span>
               </button>
             </div>
 

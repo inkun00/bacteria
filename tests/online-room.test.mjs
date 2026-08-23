@@ -60,6 +60,9 @@ test("free battle exposes room creation, joining, and four connected slots", asy
   assert.match(source, /draftSettings\.mode === "online" \|\| !openOnlineRoomCode/);
   assert.match(source, /void leaveOnlineRoom\(\)/);
   assert.match(source, /새 대전방 만들기/);
+  assert.match(source, /tab-icon" aria-hidden="true">💻/);
+  assert.match(source, /tab-icon" aria-hidden="true">👥/);
+  assert.match(source, /tab-icon" aria-hidden="true">🌐/);
   assert.match(source, /방 제목 <em>필수<\/em>/);
   assert.match(source, /비밀번호 사용/);
   assert.match(source, /방 비밀번호 입력/);
