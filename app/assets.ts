@@ -1,4 +1,4 @@
-const rawAssetVersion = process.env.NEXT_PUBLIC_ASSET_VERSION ?? "local";
+const rawAssetVersion = process.env.NEXT_PUBLIC_ASSET_VERSION ?? "badge-opt-0823";
 
 export const ASSET_VERSION = rawAssetVersion.slice(0, 12);
 
