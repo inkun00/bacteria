@@ -141,3 +141,9 @@ test("PDF libraries load with the page instead of a deployment-sensitive dynamic
   assert.match(source, /import jsPDF from "jspdf"/);
   assert.doesNotMatch(source, /import\("(?:jspdf|html2canvas)"\)/);
 });
+
+test("PDF download click also opens Ari Rank in a new tab", async () => {
+  const source = await readFile(new URL("../app/pdf-report.tsx", import.meta.url), "utf8");
+  assert.match(source, /https:\/\/samboard\.vivasam\.com\/studentEntry\/\?brdId=brd-0RCYWQ7PX34T4/);
+  assert.match(source, /window\.open\(ARI_RANK_URL, "_blank", "noopener,noreferrer"\)/);
+});

@@ -8,6 +8,8 @@ import jsPDF from "jspdf";
 import { assetUrl } from "./assets";
 import { type WorksheetReport } from "./worksheet-generator";
 
+export const ARI_RANK_URL = "https://samboard.vivasam.com/studentEntry/?brdId=brd-0RCYWQ7PX34T4";
+
 export async function exportWorksheetToPdf(report: WorksheetReport): Promise<void> {
   const container = document.getElementById("factor-force-pdf-render-root");
   if (!container) {
@@ -250,6 +252,7 @@ export function PdfDownloadButton({
   const [error, setError] = useState("");
 
   const handleDownload = useCallback(async () => {
+    window.open(ARI_RANK_URL, "_blank", "noopener,noreferrer");
     setLoading(true);
     setError("");
     try {
@@ -270,7 +273,7 @@ export function PdfDownloadButton({
         className={`pdf-export-button ${className} ${loading ? "loading" : ""}`}
         onClick={handleDownload}
         disabled={loading}
-        title="수료 인증서와 오답 맞춤형 학습지를 PDF로 다운로드합니다."
+        title="수료 인증서와 오답 맞춤형 학습지를 PDF로 다운로드하고 아리 랭크를 새 탭에서 엽니다."
       >
         <span className="pdf-icon" aria-hidden="true">📄</span>
         <span>
