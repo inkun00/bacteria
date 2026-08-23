@@ -46,6 +46,7 @@ test("ranked accounts persist points, nicknames, and expose a top-50 leaderboard
   assert.match(battleSource, /온라인 배틀넷/);
   assert.match(battleSource, /마이페이지/);
   assert.match(battleSource, /mypage-rank-badge/);
+  assert.match(battleSource, /rank-emblem rank-badge-image/);
   assert.match(battleSource, /계정생성하기/);
   assert.match(battleSource, /포인트 \{ranked\.profile\.rating\}/);
   assert.doesNotMatch(battleSource, />MMR</);

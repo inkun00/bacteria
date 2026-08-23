@@ -1326,7 +1326,11 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                 <div className="rank-account-card">
                   {ranked.profile ? (
                     <>
-                      <div className="rank-emblem" aria-hidden="true">{ratingTier(ranked.profile.rating).slice(0, 1)}</div>
+                      <img
+                        className="rank-emblem rank-badge-image"
+                        src={assetUrl(ratingTierBadge(ranked.profile.rating))}
+                        alt={`${ratingTier(ranked.profile.rating)} 배지`}
+                      />
                       <div>
                         <b>{ranked.profile.displayName}</b>
                         <span>{ratingTier(ranked.profile.rating)} · 포인트 {ranked.profile.rating} · {ranked.profile.wins}승 {ranked.profile.losses}패</span>
