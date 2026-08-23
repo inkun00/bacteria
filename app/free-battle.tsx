@@ -28,7 +28,7 @@ import {
   type Player,
   type RelationMode,
 } from "./game";
-import { ratingTier, useRankedAccount } from "./ranked-account";
+import { ratingTier, ratingTierBadge, useRankedAccount } from "./ranked-account";
 
 type Mode = "ai" | "local" | "online";
 type Settings = { mode: Mode; difficulty: Difficulty; boardSize: BoardSize };
@@ -1360,7 +1360,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
                     {ranked.profile ? (
                       <div className="mypage-grid">
                         <div className="mypage-summary">
-                          <div className="rank-emblem" aria-hidden="true">{ratingTier(ranked.profile.rating).slice(0, 1)}</div>
+                          <img className="mypage-rank-badge" src={assetUrl(ratingTierBadge(ranked.profile.rating))} alt={`${ratingTier(ranked.profile.rating)} 배지`} />
                           <small>{ratingTier(ranked.profile.rating)}</small>
                           <h4>{ranked.profile.displayName}</h4>
                           <b>포인트 {ranked.profile.rating}</b>

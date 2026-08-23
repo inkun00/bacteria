@@ -49,6 +49,20 @@ export function ratingTier(rating: number) {
   return "브론즈";
 }
 
+const RATING_TIER_BADGES: Record<ReturnType<typeof ratingTier>, string> = {
+  브론즈: "/assets/badges/hall-level-10.webp",
+  실버: "/assets/badges/hall-level-08.webp",
+  골드: "/assets/badges/hall-level-07.webp",
+  플래티넘: "/assets/badges/hall-level-05.webp",
+  다이아몬드: "/assets/badges/hall-level-03.webp",
+  마스터: "/assets/badges/hall-level-02.webp",
+  그랜드마스터: "/assets/badges/hall-level-01.webp",
+};
+
+export function ratingTierBadge(rating: number) {
+  return RATING_TIER_BADGES[ratingTier(rating)];
+}
+
 function cleanDisplayName(value: string) {
   return value.trim().replace(/\s+/g, " ").slice(0, 16);
 }

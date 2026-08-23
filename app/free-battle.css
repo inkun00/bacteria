@@ -393,7 +393,7 @@
 .free-battle .mypage-grid { display: grid; grid-template-columns: minmax(220px,.75fr) minmax(320px,1.4fr); gap: 14px; }
 .free-battle .mypage-summary,.free-battle .profile-form { min-height: 330px; padding: 28px; border: 1px solid rgba(112,158,143,.2); border-radius: 13px; background: linear-gradient(145deg,rgba(23,62,52,.66),rgba(3,18,15,.66)); }
 .free-battle .mypage-summary { display: grid; justify-items: center; align-content: center; text-align: center; }
-.free-battle .mypage-summary .rank-emblem { width: 72px; height: 72px; margin-bottom: 12px; font-size: 26px; }
+.free-battle .mypage-rank-badge { width: 148px; height: 148px; margin: -10px 0 4px; object-fit: contain; filter: drop-shadow(0 12px 24px rgba(53,234,211,.2)) drop-shadow(0 0 18px rgba(255,199,76,.12)); }
 .free-battle .mypage-summary > small { color: #d2aa5c; font: 700 8px var(--font-geist-mono),monospace; letter-spacing: .14em; }
 .free-battle .mypage-summary h4 { margin: 5px 0 6px; color: #f0fff9; font-size: 23px; }
 .free-battle .mypage-summary > b { color: var(--cyan); font: 800 11px var(--font-geist-mono),monospace; }

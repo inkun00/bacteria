@@ -40,10 +40,12 @@ test("ranked accounts persist points, nicknames, and expose a top-50 leaderboard
   assert.match(accountSource, /Math\.round\(32 \* \(actual - expected\)\)/);
   assert.match(accountSource, /limitToLast\(50\)/);
   assert.match(accountSource, /updateDisplayName/);
+  assert.match(accountSource, /ratingTierBadge/);
   assert.match(accountSource, /updateProfile\(currentUser, \{ displayName: name \}\)/);
   assert.match(battleSource, /온라인 랭킹 TOP 50/);
   assert.match(battleSource, /온라인 배틀넷/);
   assert.match(battleSource, /마이페이지/);
+  assert.match(battleSource, /mypage-rank-badge/);
   assert.match(battleSource, /계정생성하기/);
   assert.match(battleSource, /포인트 \{ranked\.profile\.rating\}/);
   assert.doesNotMatch(battleSource, />MMR</);
