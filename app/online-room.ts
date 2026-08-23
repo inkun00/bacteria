@@ -166,6 +166,7 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   const pendingCandidates = useRef(new Map<string, RTCIceCandidateInit[]>());
   const offeredPeers = useRef(new Set<string>());
   const unsubscribes = useRef<Unsubscribe[]>([]);
+  const roomsUnsubscribe = useRef<Unsubscribe | null>(null);
   const onMessageRef = useRef(onMessage);
   const leavingRef = useRef(false);
 
@@ -473,34 +474,40 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
     setError(null);
     try {
       const { database } = await getServices();
-      const snapshot = await get(query(
+      const roomsQuery = query(
         ref(database, "rooms"),
         orderByChild("status"),
         equalTo("waiting"),
         limitToLast(40),
-      ));
-      const value = snapshot.val() as Record<string, RoomRecord> | null;
-      const rooms = Object.entries(value ?? {}).flatMap(([code, room]) => {
-        const roomMatchSize: OnlineMatchSize = room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
-        const roomPlayers = Object.entries(room.players ?? {});
-        if (room.status !== "waiting" || roomPlayers.length >= roomMatchSize) return [];
-        const host = room.hostId ? room.players?.[room.hostId] : roomPlayers.find(([, player]) => player.slot === 0)?.[1];
-        return [{
-          code,
-          hostName: cleanName(host?.name ?? "이름 없는 방장"),
-          hostRating: Number.isFinite(host?.rating) ? Math.max(0, Math.round(host?.rating ?? 1000)) : 1000,
-          boardSize: room.boardSize === 9 || room.boardSize === 11 ? room.boardSize : 7,
-          matchSize: roomMatchSize,
-          playerCount: roomPlayers.length,
-          createdAt: Number.isFinite(room.createdAt) ? room.createdAt ?? 0 : 0,
-        } satisfies OnlineRoomSummary];
+      );
+      roomsUnsubscribe.current?.();
+      roomsUnsubscribe.current = onValue(roomsQuery, (snapshot) => {
+        const value = snapshot.val() as Record<string, RoomRecord> | null;
+        const rooms = Object.entries(value ?? {}).flatMap(([code, room]) => {
+          const roomMatchSize: OnlineMatchSize = room.matchSize === 2 ? 2 : DEFAULT_MATCH_SIZE;
+          const roomPlayers = Object.entries(room.players ?? {});
+          const host = room.hostId ? room.players?.[room.hostId] : roomPlayers.find(([, player]) => player.slot === 0)?.[1];
+          if (room.status !== "waiting" || roomPlayers.length >= roomMatchSize || !host) return [];
+          return [{
+            code,
+            hostName: cleanName(host.name),
+            hostRating: Number.isFinite(host.rating) ? Math.max(0, Math.round(host.rating ?? 1000)) : 1000,
+            boardSize: room.boardSize === 9 || room.boardSize === 11 ? room.boardSize : 7,
+            matchSize: roomMatchSize,
+            playerCount: roomPlayers.length,
+            createdAt: Number.isFinite(room.createdAt) ? room.createdAt ?? 0 : 0,
+          } satisfies OnlineRoomSummary];
+        });
+        rooms.sort((left, right) => right.createdAt - left.createdAt || left.code.localeCompare(right.code));
+        setAvailableRooms(rooms);
+        setRoomsRefreshedAt(Date.now());
+        setRoomsLoading(false);
+      }, (reason) => {
+        setError(reason instanceof Error ? reason.message : "방 목록을 불러오지 못했습니다.");
+        setRoomsLoading(false);
       });
-      rooms.sort((left, right) => right.createdAt - left.createdAt || left.code.localeCompare(right.code));
-      setAvailableRooms(rooms);
-      setRoomsRefreshedAt(Date.now());
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "방 목록을 불러오지 못했습니다.");
-    } finally {
       setRoomsLoading(false);
     }
   }, [getServices]);
@@ -538,9 +545,21 @@ export function useOnlineRoom(onMessage: (message: OnlineGameMessage, senderUid:
   }, []);
 
   useEffect(() => () => {
+    roomsUnsubscribe.current?.();
     unsubscribes.current.forEach((unsubscribe) => unsubscribe());
     dataChannels.current.forEach((channel) => channel.close());
     peerConnections.current.forEach((connection) => connection.close());
+    const database = databaseRef.current;
+    const code = roomCodeRef.current;
+    const uid = localUidRef.current;
+    const slot = localSlotRef.current;
+    if (!database || !code || !uid) return;
+    if (isHostRef.current) {
+      void remove(ref(database, `rooms/${code}`));
+      return;
+    }
+    void remove(ref(database, `rooms/${code}/players/${uid}`));
+    if (slot !== null) void remove(ref(database, `rooms/${code}/slotOwners/slot${slot}`));
   }, []);
 
   return {

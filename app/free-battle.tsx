@@ -202,6 +202,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
   const settledMatchRef = useRef("");
   const gameInProgress = hydrated && gameStarted && !gameOver;
   const refreshOnlineRooms = online.refreshRooms;
+  const leaveOnlineRoom = online.leave;
   const openOnlineRoomCode = online.roomCode;
 
   usePreventGameUnload(gameInProgress);
@@ -210,6 +211,11 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
     if (draftSettings.mode !== "online" || !ranked.profile || openOnlineRoomCode) return;
     void refreshOnlineRooms();
   }, [draftSettings.mode, openOnlineRoomCode, ranked.profile, refreshOnlineRooms]);
+
+  useEffect(() => {
+    if (draftSettings.mode === "online" || !openOnlineRoomCode) return;
+    void leaveOnlineRoom();
+  }, [draftSettings.mode, leaveOnlineRoom, openOnlineRoomCode]);
 
   useEffect(() => {
     const infectionSfx = new Audio(assetUrl("/assets/audio/infection-splat.ogg"));
