@@ -1534,7 +1534,7 @@ export default function FreeBattle({ onExit }: { onExit: () => void }) {
               <button onClick={() => {
                 if (settings.mode === "online") void online.leave();
                 setSetupOpen(true);
-              }}>설정 바꾸기</button>
+              }}>다른 게임하기</button>
             </div>
           </section>
         </div>
