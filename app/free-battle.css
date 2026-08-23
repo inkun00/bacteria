@@ -737,3 +737,99 @@
   font-size: 11px;
 }
 .free-battle .free-exit-button:hover { color: #fff; }
+
+/* Online hub readability: primary labels are intentionally large and standalone. */
+.free-battle .online-hub-header { min-height: 96px; }
+.free-battle .online-hub-brand h2 { font-size: 42px; }
+.free-battle .online-hub-status span { font-size: 16px; }
+.free-battle .online-hub-nav { grid-template-columns: repeat(3,minmax(0,220px)); }
+.free-battle .online-hub-nav button { min-height: 68px; grid-template-columns: 42px 1fr; grid-template-rows: 1fr; }
+.free-battle .online-hub-nav button > span { grid-row: auto; font-size: 28px; }
+.free-battle .online-hub-nav button b { align-self: center; font-size: 20px; }
+.free-battle .online-hub-section-title h3 { font-size: 40px; }
+.free-battle .online-hub-section-title > span { padding: 8px 12px; font-size: 14px; }
+.free-battle .rank-account-card { grid-template-columns: 58px minmax(0,1fr) auto auto; min-height: 82px; padding: 14px; }
+.free-battle .rank-account-card .rank-emblem { width: 54px; height: 54px; font-size: 26px; }
+.free-battle .rank-account-card b { font-size: 24px; }
+.free-battle .rank-account-card span { font-size: 16px; }
+.free-battle .rank-account-card > button { min-height: 44px; padding: 0 14px; font-size: 16px; }
+.free-battle .online-board-select > div span,
+.free-battle .match-size-select > div span { font-size: 20px; }
+.free-battle .online-board-select button,
+.free-battle .match-size-select button { min-height: 66px; }
+.free-battle .online-board-select button b { font-size: 24px; }
+.free-battle .match-size-select button b { font-size: 28px; }
+.free-battle .room-browser { padding: 16px; }
+.free-battle .room-browser > header b { font-size: 20px; }
+.free-battle .room-browser > header button { height: 44px; padding: 0 14px; font-size: 16px; }
+.free-battle .room-browser > header button span { font-size: 24px; }
+.free-battle .room-list { max-height: 330px; }
+.free-battle .room-list article { grid-template-columns: 110px minmax(190px,1.8fr) minmax(120px,.8fr) 82px; min-height: 88px; }
+.free-battle .room-mode strong { font-size: 26px; }
+.free-battle .room-list article small,
+.free-battle .room-list article span { font-size: 14px; }
+.free-battle .room-list article b { font-size: 18px; }
+.free-battle .room-details b { font-size: 20px; }
+.free-battle .room-list article > button { height: 48px; font-size: 18px; }
+.free-battle .room-browser-state { min-height: 82px; font-size: 18px; }
+.free-battle .online-entry-actions > button,
+.free-battle .online-entry-actions > div { min-height: 72px; }
+.free-battle .online-entry-actions > button b { font-size: 24px; }
+.free-battle .online-entry-actions > div { grid-template-columns: 1fr 96px; }
+.free-battle .online-entry-actions > div input { height: 56px; font-size: 24px; }
+.free-battle .online-entry-actions > div button { font-size: 20px; }
+.free-battle .room-code-card span { font-size: 18px; }
+.free-battle .room-code-card span b { font-size: 20px; }
+.free-battle .room-code-card span small { font-size: 14px; }
+.free-battle .room-code-card strong { font-size: 34px; }
+.free-battle .room-code-card button { font-size: 18px; }
+.free-battle .online-slots span,
+.free-battle .online-slots small { font-size: 14px; }
+.free-battle .online-slots b { font-size: 20px; }
+.free-battle .direct-only-note { font-size: 16px; }
+.free-battle .online-start,
+.free-battle .online-waiting,
+.free-battle .online-leave { font-size: 18px; }
+.free-battle .online-error,
+.free-battle .online-warning p { font-size: 18px; }
+.free-battle .online-warning b { font-size: 22px; }
+.free-battle .ranking-row { min-height: 62px; font-size: 18px; }
+.free-battle .ranking-row.heading { min-height: 44px; font-size: 14px; }
+.free-battle .ranking-row strong { font-size: 26px; }
+.free-battle .ranking-row em { font-size: 22px; }
+.free-battle .ranking-empty { font-size: 20px; }
+.free-battle .mypage-summary > small { font-size: 16px; }
+.free-battle .mypage-summary h4 { font-size: 40px; }
+.free-battle .mypage-summary > b { font-size: 22px; }
+.free-battle .mypage-summary > div span { min-width: 82px; font-size: 16px; }
+.free-battle .mypage-summary > div strong { font-size: 28px; }
+.free-battle .profile-form h4 { font-size: 36px; }
+.free-battle .online-lobby label span { font-size: 18px; }
+.free-battle .profile-form input { height: 56px; font-size: 22px; }
+.free-battle .profile-form > button { height: 54px; font-size: 20px; }
+.free-battle .profile-feedback { font-size: 16px; }
+.free-battle .mypage-signed-out h4 { font-size: 36px; }
+.free-battle .mypage-signed-out button { min-width: 150px; height: 50px; font-size: 18px; }
+
+@media (max-width: 720px) {
+  .free-battle .online-hub-header { min-height: 76px; }
+  .free-battle .online-hub-brand h2 { font-size: 30px; }
+  .free-battle .online-hub-nav button { min-height: 58px; grid-template-columns: 30px 1fr; }
+  .free-battle .online-hub-nav button > span { font-size: 22px; }
+  .free-battle .online-hub-nav button b { font-size: 16px; }
+  .free-battle .online-hub-section-title h3 { font-size: 30px; }
+  .free-battle .rank-account-card { grid-template-columns: 54px 1fr; }
+  .free-battle .rank-account-card b { font-size: 20px; }
+  .free-battle .rank-account-card span,
+  .free-battle .rank-account-card > button { font-size: 14px; }
+  .free-battle .online-board-select > div span,
+  .free-battle .match-size-select > div span { font-size: 18px; }
+  .free-battle .online-board-select button b { font-size: 20px; }
+  .free-battle .match-size-select button b { font-size: 22px; }
+  .free-battle .room-list article { grid-template-columns: 80px 1fr 70px; }
+  .free-battle .room-mode strong { font-size: 20px; }
+  .free-battle .room-list article small,
+  .free-battle .room-list article span { font-size: 12px; }
+  .free-battle .room-details b { font-size: 17px; }
+  .free-battle .ranking-row { grid-template-columns: 42px minmax(105px,1fr) 76px 68px; font-size: 14px; }
+}
